@@ -1,0 +1,247 @@
+/* ══════════════════════════════════════════════════════════════
+   9. 이벤트 — 위임 방식
+   ══════════════════════════════════════════════════════════════ */
+let bound=false, pending=null;
+function bindBays(){ if(bound) return; bound=true;
+  const root=$('#bays');
+
+  // 9-1 제조조건 입력 → 순방향 재계산
+  root.addEventListener('input',e=>{
+    const t=e.target; if(!t.dataset.kind) return;
+    const {g:k,kind,key}=t.dataset;
+    const v=parseFloat(t.value); if(!isFinite(v)) return;
+    const meta=kind==='comp'?EL.find(x=>x.k===key):PR.find(x=>x.k===key);
+    const nv=cl(v,meta.min,meta.max);
+    const before=S.res[k]; const prevVal=(kind==="comp"?S.g[k].comp:S.g[k].proc)[key];
+    (kind==='comp'?S.g[k].comp:S.g[k].proc)[key]=nv;
+    S.g[k].touched[key]=1; delete S.g[k].solved[key];
+    recalc();
+    const after=S.res[k];
+    logForward(k,kind,key,meta,before,after);
+    snap(k,kind==="comp"?key:meta.n,prevVal,nv,meta.d,kind==="comp"?"wt%":meta.u,
+         "제조조건 수정 → 물성 재계산",before,after,noteFor(k,kind,key,before,after));
+    t.classList.add('touched');
+    refreshOut();
+  });
+
+  // 9-2 물성 입력 → 역설계 선택지 노출
+  root.addEventListener('change',e=>{
+    const t=e.target; if(!t.dataset.prop) return;
+    const k=t.dataset.g, pk=t.dataset.prop;
+    const tgt=parseFloat(t.value); if(!isFinite(tgt)) return;
+    const cur=S.res[k][pk], meta=PROP.find(x=>x.k===pk);
+    if(Math.abs(tgt-cur)<Math.abs(cur)*0.002){ t.value=f(cur,meta.d); return; }
+    pending={k,pk,tgt,cur};
+    const box=$(`#ch-${k}-${meta.grp}`);
+    box.hidden=false;
+    box.innerHTML=`<p><b>${meta.n}</b> ${f(cur,meta.d)} → <b>${f(tgt,meta.d)}</b> ${meta.u}
+      &nbsp;무엇을 바꿔 맞출까요?</p>
+      <button class="btn sm" data-solve="comp">성분 변경</button>
+      <button class="btn sm" data-solve="proc">제조조건 변경</button>
+      <button class="btn sm" data-solve="cancel">취소</button>`;
+    document.querySelectorAll('.prop').forEach(p=>p.classList.remove('tgt'));
+    t.closest('.prop').classList.add('tgt');
+  });
+
+  // 9-3 선택 처리
+  root.addEventListener('click',e=>{
+    const b=e.target.closest('[data-solve]'); if(!b||!pending) return;
+    const mode=b.dataset.solve, {k,pk,tgt}=pending;
+    if(mode==='cancel'){ pending=null; render(); return; }
+    const bIn=S.res[k];
+    const r=solve(k,pk,tgt,mode);
+    logInverse(k,r);
+    snap(k,PROP.find(x=>x.k===pk).n,r.base,r.achieved,PROP.find(x=>x.k===pk).d,
+         PROP.find(x=>x.k===pk).u, mode==="comp"?"역설계 · 성분 조정":"역설계 · 제조조건 조정",
+         bIn,S.res[k],
+         r.steps.length
+           ? (mode==="comp"?"성분 ":"제조조건 ")+r.steps.map(s=>s.mode==="comp"?s.knob:PR.find(x=>x.k===s.knob).n).join(", ")
+             +" 을(를) 단위 원가당 물성 변화량이 큰 순으로 조정했습니다."
+             +(Math.abs(r.achieved-r.target)<Math.abs(r.target)*0.01?"":" 규격·조업창 한계로 목표에는 도달하지 못했습니다.")
+           : "규격·조업창 내에 해가 없어 변경하지 않았습니다.");
+    pending=null; render();
+    const bay=document.querySelector(`[data-bay="${k}"]`);
+    if(bay) bay.querySelector('details.basis').open=true;
+  });
+}
+
+
+/* ── 변경 스냅샷 : 요약 패널의 원본 데이터 ─────────────────── */
+function snap(k,what,from,to,dec,unit,mode,A,B,note){
+  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note};
+}
+function noteFor(k,kind,key,A,B){
+  const R=B;
+  if(kind==='comp'){
+    if(key==='Cr') return 'Cr 는 PREN·Creq·Ac1 을 동시에 올리는 축입니다. 내식성이 개선되는 대신 페라이트 안정화가 진행되고 합금비가 kg 당 ' + S.prices.Cr + ' USD 증가합니다.';
+    if(key==='Ni') return 'Ni 는 Nieq 를 통해 오스테나이트를 안정화합니다. 원가 기여도가 가장 큰 원소이므로 N·Cu·Mn 치환 여지를 함께 검토하십시오.';
+    if(key==='C'||key==='N') return '침입형 원소는 고용강화(Pickering 식 계수 C 23, N 32)로 강도를 직접 올리는 대신, 오스테나이트계에서는 Md30 을 낮춰 TRIP 연신을 깎고 페라이트계에서는 예민화 위험을 키웁니다.';
+    if(key==='Ti'||key==='Nb') return 'Ti·Nb 는 탄질화물로 C 를 고정해 예민화를 막습니다. Ti 는 N 을 먼저(TiN, Ti/N=3.42) 소모하므로 C 고정분까지 확보하려면 그만큼 더 넣어야 하고, 과잉 Ti 는 TiN 개재물로 공식전위를 깎습니다.';
+    if(key==='Mo') return 'Mo 는 PREN 계수 3.3 으로 내공식성 기여가 크고 임계전류밀도도 낮추지만, kg 당 ' + S.prices.Mo + ' USD 로 가장 비싼 원소입니다.';
+    if(key==='S') return 'S 는 MnS 개재물로 공식 기점이 됩니다. 낮출수록 내식성이 좋아지지만 심탈황 비용이 로그 스케일로 증가합니다.';
+    if(key==='Cu') return 'Cu 는 Nieq 에 1.0 계수로 들어가 Ni 를 대체할 수 있고 임계전류밀도를 크게 낮추지만, 과다 시 열간취성 위험이 있습니다.';
+    return '성분 변화가 당량·PREN·조직 경로를 거쳐 물성에 반영되었습니다.';
+  }
+  if(key==='crAnnT'||key==='hrAnnT'){
+    if(R.fam!=='austenitic' && R.gmax>5)
+      return '소둔온도는 Ac1 ' + f(R.ac1,0) + ' ℃ 를 기준으로 거동이 갈립니다. 아래면 탄화물이 구상화된 연질 페라이트, 위면 오스테나이트가 생겨 냉각 중 마르텐사이트로 변태해 경도가 급등합니다.';
+    return '소둔온도는 Beck 성장식 exp(−Q/RT) 항을 통해 결정립에 지수적으로 작용합니다. 온도가 오르면 입경이 커져 Hall–Petch 강화가 줄고 연신이 늘어납니다.';
+  }
+  if(key==='crAnnV'||key==='hrAnnV') return '라인속도는 소둔 유효시간(45 m ÷ 속도)을 통해 결정립 성장시간과 예민화역 체류시간을 동시에 바꿉니다. 빠를수록 입경이 작아 강도가 오르고 톤당 고정비가 줄지만, 재결정 미완 위험이 생깁니다.';
+  if(key==='fdt'||key==='ct') return '열연 조건은 열연판 결정립을 통해 냉연 재결정 초기립에 이어집니다. 페라이트계에서는 이 경로가 리징과 r값을 좌우합니다.';
+  if(key==='hrT'||key==='crT') return '두께 변경은 냉간압하율 ' + f(R.crRed,1) + ' % 를 바꿉니다. 압하율이 클수록 저장에너지가 커져 재결정립이 미세해지고 {111} 집합조직이 발달합니다.';
+  if(key==='rhfT'||key==='rdt'||key==='slab') return '재가열·조압연 조건은 석출물 고용도와 총 압하량을 통해 하공정 조직에 간접 작용합니다.';
+  return '공정 변화가 조직 경로를 거쳐 물성에 반영되었습니다.';
+}
+/* ── 변경 이력 기록 ─────────────────────────────────────────── */
+function delta(a,b,key,d,u){
+  const dv=b-a; if(Math.abs(dv)<Math.pow(10,-d)/2) return '';
+  const cls=dv>0?'up':'dn';
+  return ` <span class="${cls}">${key} ${sgn(dv,d)}${u}</span>`;
+}
+function logForward(k,kind,key,meta,A,B){
+  const nm=kind==='comp'?key:meta.n, u=kind==='comp'?' wt%':' '+meta.u;
+  let d='';
+  d+=delta(A.YS,B.YS,'YS',0,'');
+  d+=delta(A.TS,B.TS,'TS',0,'');
+  d+=delta(A.EL,B.EL,'EL',1,'');
+  d+=delta(A.HV,B.HV,'HV',0,'');
+  d+=delta(A.Ep,B.Ep,'Ep',0,'mV');
+  d+=delta(A.ic,B.ic,'icrit',2,'');
+  d+=delta(A.cost.total,B.cost.total,'원가',0,'$');
+  if(!d) return;
+  let why='';
+  if(kind==='comp'){
+    const dd=B.d-A.d;
+    why=`<span class="d">경로: ${key} 변화 → `
+      +(B.fam==='austenitic'
+        ? `Nieq ${f(A.nieq,2)}→${f(B.nieq,2)}, Md30 ${f(A.md30,0)}→${f(B.md30,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`
+        : `γmax ${f(A.gmax,0)}→${f(B.gmax,0)} %, Ac1 ${f(A.ac1,0)}→${f(B.ac1,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`)
+      +(Math.abs(dd)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`;
+  }else{
+    why=`<span class="d">경로: ${nm} 변화 → 결정립 ${f(A.d,1)}→${f(B.d,1)} µm (ASTM ${f(A.G,1)}→${f(B.G,1)}), `
+      +`DOS ${f(A.DOS,0)}→${f(B.DOS,0)}`
+      +(A.fm!==B.fm?`, 마르텐사이트 ${f(A.fm*100,0)}→${f(B.fm*100,0)} %`:'')+`</span>`;
+  }
+  S.log[k].push(`<b>${nm} → ${(kind==='comp'?S.g[k].comp:S.g[k].proc)[key]}${u}</b>${d}<br>${why}`);
+}
+function logInverse(k,r){
+  const meta=PROP.find(x=>x.k===r.prop);
+  const head=`<b>역설계 · ${meta.n} ${f(r.base,meta.d)} → 목표 ${f(r.target,meta.d)} ${meta.u}</b>`;
+  if(!r.steps.length){
+    S.log[k].push(head+` <span class="dn">달성 불가</span><br>
+      <span class="d">${r.mode==='comp'?'성분':'제조조건'} 조정 범위(규격·설비 한계) 내에서 목표에 도달하는 해가 없습니다.
+      다른 조정 대상을 선택하거나 목표를 완화하십시오.</span>`);
+    return;
+  }
+  const body=r.steps.map(s=>{
+    const nm=s.mode==='comp'?s.knob:PR.find(x=>x.k===s.knob).n;
+    return `${nm} ${f(s.from,s.d)} → ${f(s.to,s.d)} ${s.unit} `
+      +`(감도 ${sgn(s.sens,Math.abs(s.sens)>10?1:2)} ${meta.u}/${s.unit}, `
+      +`${meta.n} ${sgn(s.dP,meta.d)}, 원가 ${sgn(s.dC,1)} $/t)`;
+  }).join('<br>');
+  const rank=r.sens.slice(0,4).map(s=>{
+    const nm=r.mode==='comp'?s.e:PR.find(x=>x.k===s.e).n;
+    return `${nm} ${f(s.eff,2)}`;}).join(' · ');
+  const hit=Math.abs(r.achieved-r.target)<Math.abs(r.target)*0.01;
+  const rej=(r.rejected||[]).map(x=>{
+    const nm=x.mode==='comp'?x.knob:PR.find(y=>y.k===x.knob).n;
+    return `${nm} → ${f(x.to,x.d)} 기각: ${x.why.join(' / ')}`;}).join('<br>');
+  S.log[k].push(head+` <span class="${hit?'up':'dn'}">달성 ${f(r.achieved,meta.d)}</span>`
+    +(hit?'':` <span class="dn">— 규격·조업창 내에서 목표 미달</span>`)+`<br>
+    <span class="d">선정 기준: 단위 원가당 물성 변화량(감도÷원가탄력도)이 큰 순.
+    후보 효율 순위 — ${rank}<br>${body}`
+    +(rej?`<br><b>기각된 후보</b><br>${rej}`:'')+`</span>`);
+}
+
+/* ── 출력부만 갱신 (입력 포커스 유지) ───────────────────────── */
+function refreshOut(){
+  const rv=review();
+  renderTabs(rv); renderBoard(rv);
+  ORDER.forEach(k=>{
+    const bay=document.querySelector(`[data-bay="${k}"]`); if(!bay) return;
+    const R=S.res[k], cons=constraints(k,R), ops=operability(k);
+    const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
+    const chips=[specOK?['ok','A240 적합']:['no','A240 부적합'],
+      cons.filter(x=>x.lv==='wa').length?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상'],
+      ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능'],
+      ['ok',`${f(R.cost.total,0)} USD/t`]];
+    bay.querySelector('.chips').innerHTML=chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('');
+    bay.querySelector('.col.out').innerHTML=
+      `<div class="grp"><div class="grp-h"><h3>기계적 성질</h3>
+        <span class="hint">값을 고쳐 넣으면 역설계</span></div>
+        <div class="props">${propHTML(k,'mech')}</div></div>
+      <div class="grp"><div class="grp-h"><h3>내식성</h3>
+        <span class="u">3.5 % NaCl 30 ℃ / 0.5 M H₂SO₄</span></div>
+        <div class="props">${propHTML(k,'corr')}</div></div>
+      <div class="grp"><div class="grp-h"><h3>야금 지표</h3></div>${idxHTML(k)}</div>
+      <div class="grp"><div class="grp-h"><h3>원가</h3></div>${costHTML(k)}</div>`;
+    const th=bay.querySelector(".thermo"); if(th) th.outerHTML=thermo(k);
+    const sw=bay.querySelector(".sumwrap"); if(sw) sw.innerHTML=summaryHTML(k);
+    const det=bay.querySelector('details.basis');
+    const wasOpen=det.open;
+    det.querySelector('summary').textContent=`설계 근거 · 적용 회귀식 ${R.eq.length}건`;
+    det.querySelector('.basis-body').innerHTML=R.eq.map(e=>
+      `<div class="eq"><h4>${esc(e.h)}</h4><code>${esc(e.f)}</code>
+       <p>${esc(e.t).replace(/\n/g,'<br>')}</p><p class="src">${esc(e.s)}</p></div>`).join('');
+    det.querySelector('.trail').innerHTML=`<div class="trail-h">변경 이력</div>`
+      +(S.log[k].length?S.log[k].slice(-14).reverse().map(e=>`<div class="entry">${e}</div>`).join('')
+        :'<div class="empty">변경 없음 — 기준 설계값</div>');
+    det.open=wasOpen;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   10. 상단 툴바
+   ══════════════════════════════════════════════════════════════ */
+$('#btnReset').onclick=()=>{ initState(); render(); renderSuggest(); renderThread(); };
+$('#btnFix').onclick=()=>{
+  const ap=autoFix(); S.tab=REVIEW_TAB; render();
+  const rv=review();
+  ask(rv.pass
+    ?`자동 개선 완료 — 페르소나 전원 ${rv.min.toFixed(1)}점 이상 달성`
+    :`자동 개선 시도 — 현재 최저 ${rv.min.toFixed(1)}점`,
+    `<p>${ap.length?'적용된 변경 '+ap.length+'건:':'적용 가능한 자동 개선안이 없습니다. 지적사항이 상충하거나 이미 한계값입니다.'}</p>`
+    +(ap.length?`<ul>${ap.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'')
+    +`<p>${rv.pass?'페르소나 5인 전원이 9.0 이상으로 <b>설계 승인</b> 상태입니다.'
+      :'남은 지적사항은 페르소나 보드의 ▲ 표시 항목입니다.'}</p>`);
+};
+$('#btnNi').onclick=()=>{
+  const res=[];
+  ORDER.forEach(k=>{
+    const nc=niCut(k); if(!nc) return;
+    Object.keys(nc.c).forEach(e=>{ if(Math.abs(nc.c[e]-S.g[k].comp[e])>1e-9) S.g[k].solved[e]=1; });
+    const before=S.res[k]; const prevNi=S.g[k].comp.Ni;
+    S.g[k].comp={...nc.c}; recalc();
+    const A=S.res[k];
+    S.log[k].push(`<b>Ni 절감 최적화</b> <span class="up">원가 −${f(nc.save,0)} $/t</span><br>
+      <span class="d">Ni ${f(before.cost.brk.Ni/10/S.prices.Ni,2)} → ${f(S.g[k].comp.Ni,2)} wt%,
+      N +${f(nc.dN,3)}, Cu +${f(nc.dCu,2)}, Mn +${f(nc.dMn,2)}<br>
+      제약 유지: Md30 ${f(before.md30,0)}→${f(A.md30,0)} ℃ (±12 이내), PREN ${f(before.pren,1)}→${f(A.pren,1)},
+      δ@1300 ${f(A.dCast,1)} %, FN ${f(A.FN,1)}, YS ${f(A.YS,0)} / TS ${f(A.TS,0)} / EL ${f(A.EL,1)} 모두 A240 충족<br>
+      근거: Nieq = Ni+22C+14.2N+0.31Mn+Cu 에서 N은 Ni의 14.2배, Cu는 1배 오스테나이트 안정화 효과를 내지만
+      단가는 N $${S.prices.N}/kg · Cu $${S.prices.Cu}/kg 대 Ni $${S.prices.Ni}/kg 이므로 등가 안정화당 비용이 낮음</span>`);
+    snap(k,"Ni",prevNi,S.g[k].comp.Ni,2,"wt%","최소원가 최적화 · 성분 치환",before,A,
+      "Nieq = Ni+22C+14.2N+0.31Mn+Cu 에서 N 의 계수는 14.2, Cu 는 1.0 입니다. 즉 N 1 kg 이 Ni 14.2 kg 의 오스테나이트 안정화 효과를 내면서 단가는 훨씬 낮으므로, Md30 등가를 유지한 채 Ni 를 덜어낼 수 있습니다.");
+    res.push(`${GRADES[k].label}: Ni −${nc.dNi.toFixed(2)} wt% → −${nc.save.toFixed(0)} USD/t`);
+  });
+  render();
+  ask('Ni 절감 최적화',res.length
+    ?`<p>Md30 ±12 ℃, PREN, δ@1300 ℃, 용접 FN, A240 기계적 규격을 모두 유지하는 조건에서
+       N·Cu·Mn 으로 Ni 를 치환했습니다.</p><ul>${res.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>`
+    :'<p>현재 설계에서 제약을 유지하며 추가로 절감 가능한 Ni 여유가 없습니다. 이미 최소 원가 근방입니다.</p>');
+};
+$('#btnPrices').onclick=()=>{
+  const box=$('#priceBox');
+  box.hidden=!box.hidden;
+  if(!box.hidden) box.querySelector('input').focus();
+};
+
+/* ── 탭 전환 ────────────────────────────────────────────────── */
+$('#tabs').addEventListener('click',e=>{
+  const b=e.target.closest('[data-tab]'); if(!b) return;
+  S.tab=b.dataset.tab;
+  renderTabs(); applyTab();
+  window.scrollTo({top:$('#tabs').offsetTop-14,
+    behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+});

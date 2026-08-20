@@ -1,0 +1,2070 @@
+<title>강종 설계 워크벤치</title>
+<style>
+:root{
+  --ground:#F0F3F5; --panel:#FFFFFF; --panel-2:#F7F9FA; --sunken:#E7ECEF;
+  --line:#D3DBE1; --line-soft:#E3E9ED;
+  --ink:#141A20; --ink-2:#485864; --ink-3:#778793;
+  --teal:#0E6E7A; --teal-soft:#DCEEF0; --teal-line:#8FC5CC;
+  --amber:#B05810; --amber-soft:#F7E9DA; --amber-line:#DFB98A;
+  --pass:#2C7A4B; --pass-soft:#DFF0E5;
+  --warn:#96660A; --warn-soft:#FAEDD2;
+  --fail:#A93030; --fail-soft:#F8E0DE;
+  --edit:#6B3FA0; --edit-soft:#EEE6F7;
+  --shadow:0 1px 2px rgba(20,26,32,.06),0 4px 14px rgba(20,26,32,.05);
+  --disp:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Segoe UI Variable Text","Segoe UI","Malgun Gothic",system-ui,sans-serif;
+  --mono:"Cascadia Mono","Consolas",ui-monospace,"SFMono-Regular",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1317; --panel:#161D23; --panel-2:#1B242B; --sunken:#111820;
+    --line:#2B363F; --line-soft:#232D35;
+    --ink:#DFE6EB; --ink-2:#9FB0BC; --ink-3:#6F818E;
+    --teal:#43ADBA; --teal-soft:#12333A; --teal-line:#2A6B76;
+    --amber:#DE9040; --amber-soft:#3A2716; --amber-line:#7A5228;
+    --pass:#5CBE83; --pass-soft:#132B1E;
+    --warn:#D9A63C; --warn-soft:#2F2510;
+    --fail:#E1706A; --fail-soft:#341A19;
+    --edit:#B08BE0; --edit-soft:#241A33;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1317; --panel:#161D23; --panel-2:#1B242B; --sunken:#111820;
+  --line:#2B363F; --line-soft:#232D35;
+  --ink:#DFE6EB; --ink-2:#9FB0BC; --ink-3:#6F818E;
+  --teal:#43ADBA; --teal-soft:#12333A; --teal-line:#2A6B76;
+  --amber:#DE9040; --amber-soft:#3A2716; --amber-line:#7A5228;
+  --pass:#5CBE83; --pass-soft:#132B1E;
+  --warn:#D9A63C; --warn-soft:#2F2510;
+  --fail:#E1706A; --fail-soft:#341A19;
+  --edit:#B08BE0; --edit-soft:#241A33;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1500px;margin:0 auto;padding:0 20px 80px}
+h1,h2,h3,h4{font-family:var(--disp);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+button{font-family:inherit;font-size:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:3px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ── masthead ─────────────────────────────── */
+.masthead{border-bottom:1px solid var(--line);background:var(--panel);margin-bottom:22px}
+.masthead-in{max-width:1500px;margin:0 auto;padding:18px 20px 16px;display:flex;
+  flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between}
+.brand{display:flex;flex-direction:column;gap:3px}
+.eyebrow{font-family:var(--disp);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--teal);font-weight:600}
+.brand h1{font-size:30px;line-height:1.08}
+.brand p{margin:2px 0 0;color:var(--ink-2);font-size:13px;max-width:62ch}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:5px;padding:7px 13px;
+  cursor:pointer;font-family:var(--disp);font-size:13px;font-weight:600;letter-spacing:.02em;
+  transition:background .12s,border-color .12s}
+.btn:hover{background:var(--sunken);border-color:var(--ink-3)}
+.btn.pri{background:var(--teal);border-color:var(--teal);color:#fff}
+:root[data-theme="dark"] .btn.pri,
+:root:not([data-theme="light"]) .btn.pri{color:#08181B}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .btn.pri{color:#fff}}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.sm{padding:4px 9px;font-size:12px}
+
+/* ── overview strip ───────────────────────── */
+.overview{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px}
+.ov-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:11px 16px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.ov-head h2{font-size:15px;letter-spacing:.04em;text-transform:uppercase}
+.ov-head span{font-size:12px;color:var(--ink-3)}
+.ov-scroll{overflow-x:auto}
+table.cmp{width:100%;border-collapse:collapse;min-width:900px}
+table.cmp th,table.cmp td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line-soft);
+  white-space:nowrap}
+table.cmp th{font-family:var(--disp);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;background:var(--panel-2)}
+table.cmp th:first-child,table.cmp td:first-child{text-align:left}
+table.cmp tbody tr:last-child td{border-bottom:none}
+table.cmp td.g{font-family:var(--disp);font-weight:600;font-size:15px}
+table.cmp td .num{font-size:13.5px}
+.spec-lo{color:var(--fail);font-weight:600}
+.mini{font-size:11px;color:var(--ink-3);margin-left:4px}
+
+/* ── family tabs ──────────────────────────── */
+.tabbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;
+  margin-bottom:20px}
+.tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;
+  padding:10px 13px 11px;border:1px solid var(--line);border-radius:7px;background:var(--panel);
+  cursor:pointer;position:relative;transition:border-color .12s,background .12s;
+  box-shadow:var(--shadow)}
+.tab:hover{border-color:var(--ink-3)}
+.tab.on{border-color:var(--teal);background:var(--teal-soft);box-shadow:none}
+.tab.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;
+  background:var(--teal);border-radius:0 0 6px 6px}
+.tab b{font-family:var(--disp);font-size:16px;font-weight:600;letter-spacing:.01em;
+  display:flex;align-items:center;gap:7px}
+.tab.on b{color:var(--teal)}
+.tab span{font-family:var(--mono);font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.tab i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.tdot-ok{background:var(--pass)}.tdot-wa{background:var(--warn)}.tdot-no{background:var(--fail)}
+
+.tab.rev{background:var(--panel-2);border-style:dashed}
+.tab.rev b{color:var(--ink-2)}
+.tab.rev.on{background:var(--teal-soft);border-style:solid}
+.tab.rev.on b{color:var(--teal)}
+.board-sub{flex:1 1 100%;order:3;font-size:12px;color:var(--ink-3);line-height:1.5;
+  max-width:80ch;margin-top:2px}
+
+/* ── thermal profile ──────────────────────── */
+.tplot{position:relative;width:100%}
+.tplot svg{position:absolute;inset:0;width:100%;height:100%}
+.tgrid,.tac1{position:absolute;left:0;transform:translateY(-50%);font-family:var(--mono);
+  font-size:11px;background:var(--sunken);padding:0 4px;border-radius:2px;pointer-events:none}
+.tgrid{color:var(--ink-3)}
+.tac1{left:auto;right:0;color:var(--fail);font-weight:600;border:1px solid var(--fail)}
+.tdot{position:absolute;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);
+  border:2px solid var(--sunken)}
+.tdot.hot{background:var(--amber)}.tdot.cold{background:var(--teal)}
+.tstage{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;margin-top:8px}
+.tstage div{display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;
+  border-top:2px solid var(--line);padding-top:5px;min-width:0}
+.tstage div.hot{border-top-color:var(--amber-line)}
+.tstage div.cold{border-top-color:var(--teal-line)}
+.tstage b{font-family:var(--disp);font-size:12px;font-weight:600;letter-spacing:.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tstage span{font-family:var(--mono);font-size:12px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+
+/* ── change summary ───────────────────────── */
+.sumwrap{border-top:1px solid var(--line)}
+.sumbox{padding:14px 16px;background:var(--edit-soft)}
+.sumbox.empty-sum{background:var(--panel-2);color:var(--ink-2);font-size:12.5px;line-height:1.6}
+.sumbox.empty-sum b{font-family:var(--disp);color:var(--ink);letter-spacing:.03em}
+.sum-h{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:11px;
+  padding-bottom:9px;border-bottom:1px solid var(--edit)}
+.sum-h>b{font-family:var(--disp);font-size:13px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--edit)}
+.sum-what{font-size:14px;font-weight:600}
+.sum-what .num{font-size:14px}
+.sum-mode{margin-left:auto;font-family:var(--disp);font-size:11.5px;letter-spacing:.05em;
+  color:var(--ink-2);border:1px solid var(--edit);border-radius:3px;padding:2px 8px}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.sum-t{font-family:var(--disp);font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:6px}
+.sum-mid{margin:0;padding-left:17px;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+.sum-mid li{margin-bottom:4px}
+.sum-mid b{font-family:var(--disp);color:var(--ink);font-weight:600}
+table.sum-tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.sum-tb th{font-family:var(--disp);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3);text-align:right;padding:0 7px 4px;font-weight:600}
+table.sum-tb th:first-child{text-align:left}
+table.sum-tb td{padding:4px 7px;text-align:right;border-top:1px solid var(--edit);white-space:nowrap}
+table.sum-tb td:first-child{text-align:left;font-family:var(--disp);font-weight:600}
+table.sum-tb td:last-child{text-align:left;white-space:normal}
+table.sum-tb .num{font-size:12.5px}
+table.sum-tb .up{color:var(--pass);font-weight:600}
+table.sum-tb .dn{color:var(--fail);font-weight:600}
+.sf{font-family:var(--disp);font-size:10.5px;font-weight:600;letter-spacing:.03em;
+  padding:1.5px 6px;border-radius:3px;border:1px solid;white-space:nowrap}
+.sf.ok{color:var(--pass);border-color:var(--pass);background:var(--pass-soft)}
+.sf.wa{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.sf.no{color:var(--fail);border-color:var(--fail);background:var(--fail-soft)}
+.sum-v{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.sum-note{margin:10px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-2);max-width:78ch}
+
+/* ── review board ─────────────────────────── */
+.board{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:var(--shadow);margin-bottom:22px;overflow:hidden}
+.board-head{padding:11px 16px;border-bottom:1px solid var(--line-soft);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.board-head h2{font-size:15px;letter-spacing:.04em;text-transform:uppercase}
+.gate{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.06em;
+  padding:4px 11px;border-radius:4px;text-transform:uppercase}
+.gate.ok{background:var(--pass-soft);color:var(--pass);border:1px solid var(--pass)}
+.gate.no{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn)}
+.personas{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;
+  background:var(--line-soft)}
+.persona{background:var(--panel);padding:13px 15px;display:flex;flex-direction:column;gap:7px}
+.p-top{display:flex;align-items:center;gap:9px}
+.dot{width:11px;height:11px;border-radius:50%;flex:none;box-shadow:0 0 0 3px var(--panel),0 0 0 4px currentColor}
+.p-name{font-family:var(--disp);font-weight:600;font-size:13.5px;flex:1;line-height:1.2}
+.p-name em{display:block;font-style:normal;font-size:11px;color:var(--ink-3);font-weight:400;
+  letter-spacing:.02em}
+.score{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.score small{font-size:11px;color:var(--ink-3);font-weight:400}
+.bar{height:4px;background:var(--sunken);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:2px;transition:width .35s ease}
+.p-notes{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;
+  font-size:11.5px;color:var(--ink-2);line-height:1.45}
+.p-notes li{display:flex;gap:6px}
+.p-notes li::before{content:"—";color:var(--ink-3);flex:none}
+.p-notes li.hit::before{content:"▲";color:var(--warn);font-size:9px;line-height:1.7}
+
+/* ── bays ─────────────────────────────────── */
+.bay{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+.bay-head{display:flex;align-items:center;gap:14px;padding:12px 16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);background:var(--panel-2)}
+.bay-id{display:flex;align-items:baseline;gap:10px}
+.bay-id b{font-family:var(--disp);font-size:22px;font-weight:600;letter-spacing:.01em}
+.bay-id span{font-size:12px;color:var(--ink-2)}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+.chip{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.04em;
+  padding:2.5px 8px;border-radius:3px;border:1px solid;white-space:nowrap}
+.chip.ok{background:var(--pass-soft);color:var(--pass);border-color:var(--pass)}
+.chip.wa{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.chip.no{background:var(--fail-soft);color:var(--fail);border-color:var(--fail)}
+.bay-body{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)}
+@media (max-width:1080px){.bay-body{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:0;min-width:0}
+.col.in{border-right:1px solid var(--line)}
+@media (max-width:1080px){.col.in{border-right:none;border-bottom:1px solid var(--line)}}
+.grp{padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+.grp:last-child{border-bottom:none}
+.grp-h{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+.grp-h h3{font-size:12px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2)}
+.grp-h .u{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.grp-h .hint{margin-left:auto;font-size:11px;color:var(--ink-3)}
+.rail{border-left:3px solid transparent;padding-left:13px;margin-left:-16px;padding-left:29px}
+.rail.hot{border-left-color:var(--amber-line)}
+.rail.cold{border-left-color:var(--teal-line)}
+.rail.comp{border-left-color:var(--ink-3)}
+
+/* fields */
+.fields{display:grid;gap:6px 10px}
+.fields.c13{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.fields.p13{grid-template-columns:repeat(auto-fill,minmax(122px,1fr))}
+.f{display:flex;flex-direction:column;gap:2px;min-width:0}
+.f label{font-family:var(--disp);font-size:10.5px;letter-spacing:.05em;color:var(--ink-3);
+  display:flex;justify-content:space-between;gap:4px;line-height:1.3}
+.f label i{font-style:normal;font-family:var(--mono);font-size:9.5px;opacity:.75}
+.f input{width:100%;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;
+  padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);
+  color:var(--ink);text-align:right;transition:border-color .12s,background .12s}
+.f input:hover{border-color:var(--ink-3)}
+.f input:focus{border-color:var(--teal);background:var(--panel);outline:none;
+  box-shadow:0 0 0 2px var(--teal-soft)}
+.f input.touched{border-color:var(--edit);background:var(--edit-soft);font-weight:600}
+.f input.oos{border-color:var(--fail);background:var(--fail-soft)}
+.f input.solved{animation:flash 1.1s ease}
+@keyframes flash{0%{background:var(--teal-soft);border-color:var(--teal)}100%{}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{
+  -webkit-appearance:none;margin:0}
+
+/* thermal profile */
+.thermo{background:var(--sunken);border:1px solid var(--line-soft);border-radius:6px;
+  padding:11px 13px 10px;margin-bottom:10px}
+.thermo .cap{font-family:var(--disp);font-size:12px;letter-spacing:.06em;
+  color:var(--ink-2);margin-bottom:9px}
+
+/* property readouts */
+.props{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+.prop{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--panel-2);
+  display:flex;flex-direction:column;gap:3px;position:relative}
+.prop.tgt{border-color:var(--edit);background:var(--edit-soft)}
+.prop-l{font-family:var(--disp);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-3);display:flex;justify-content:space-between;gap:5px}
+.prop-l b{font-weight:600;color:var(--ink-2)}
+.prop input{width:100%;border:none;background:transparent;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;font-size:20px;font-weight:600;color:var(--ink);padding:0;
+  border-bottom:1px dashed var(--line);text-align:left}
+.prop input:focus{outline:none;border-bottom-color:var(--teal)}
+.prop .sub{font-size:10.5px;color:var(--ink-3);font-family:var(--mono);display:flex;
+  justify-content:space-between;gap:4px}
+.prop .sub .vs{font-weight:600}
+.prop .sub .vs.lo{color:var(--fail)}
+.prop .sub .vs.hi{color:var(--warn)}
+.prop .sub .vs.ok{color:var(--pass)}
+
+/* chooser */
+.chooser{grid-column:1/-1;border:1px solid var(--edit);background:var(--edit-soft);
+  border-radius:6px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chooser p{margin:0;font-size:12.5px;flex:1;min-width:210px;line-height:1.4}
+.chooser p b{font-family:var(--mono);color:var(--edit)}
+.chooser .btn{background:var(--panel)}
+
+/* index list */
+.idx{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:5px 14px}
+.ix{display:flex;justify-content:space-between;align-items:baseline;gap:7px;
+  border-bottom:1px dotted var(--line);padding:3px 0;font-size:12px}
+.ix .k{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ix .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.ix .v.ok{color:var(--pass)}.ix .v.wa{color:var(--warn)}.ix .v.no{color:var(--fail)}
+
+/* cost */
+.cost-top{display:flex;align-items:baseline;gap:9px;margin-bottom:9px;flex-wrap:wrap}
+.cost-top b{font-family:var(--mono);font-size:23px;font-weight:600}
+.cost-top span{font-size:11.5px;color:var(--ink-3)}
+.cbar{display:flex;height:19px;border-radius:4px;overflow:hidden;border:1px solid var(--line);
+  margin-bottom:7px}
+.cbar div{position:relative}
+.cbar div span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);
+  font-size:9.5px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden}
+.clegend{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:2px 12px;
+  font-size:11.5px}
+.clegend div{display:flex;justify-content:space-between;gap:6px;align-items:baseline}
+.clegend i{width:8px;height:8px;border-radius:2px;flex:none;margin-right:5px;display:inline-block}
+.clegend b{font-family:var(--mono);font-weight:600}
+
+/* basis / log */
+details.basis{border-top:1px solid var(--line);background:var(--panel-2)}
+details.basis>summary{padding:10px 16px;cursor:pointer;font-family:var(--disp);font-size:12px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);list-style:none;
+  display:flex;align-items:center;gap:8px}
+details.basis>summary::-webkit-details-marker{display:none}
+details.basis>summary::before{content:"▸";color:var(--teal);font-size:11px;transition:transform .15s}
+details.basis[open]>summary::before{transform:rotate(90deg)}
+.basis-body{padding:0 16px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:14px}
+.eq{border-left:2px solid var(--teal-line);padding:2px 0 2px 11px}
+.eq h4{font-size:12px;font-family:var(--disp);letter-spacing:.03em;margin-bottom:2px}
+.eq code{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-2);
+  background:var(--sunken);padding:5px 7px;border-radius:4px;margin:3px 0;overflow-x:auto;
+  white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.eq p{margin:2px 0 0;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.eq .src{font-size:10.5px;color:var(--ink-3);font-style:italic}
+.trail{padding:0 16px 14px;display:flex;flex-direction:column;gap:6px}
+.trail-h{font-family:var(--disp);font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-3);padding-top:12px;border-top:1px solid var(--line-soft)}
+.entry{border-left:2px solid var(--edit);padding:3px 0 3px 10px;font-size:12px;line-height:1.5}
+.entry b{font-family:var(--mono);font-size:11.5px}
+.entry .d{color:var(--ink-2);font-size:11.5px}
+.entry .up{color:var(--pass);font-family:var(--mono)}
+.entry .dn{color:var(--fail);font-family:var(--mono)}
+.empty{color:var(--ink-3);font-size:12px;font-style:italic}
+
+/* ask */
+.ask{background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);
+  overflow:hidden;margin-bottom:20px}
+.ask-head{padding:11px 16px;border-bottom:1px solid var(--line-soft)}
+.ask-head h2{font-size:15px;letter-spacing:.04em;text-transform:uppercase}
+.ask-head p{margin:2px 0 0;font-size:12px;color:var(--ink-3)}
+.ask-form{display:flex;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.ask-form input{flex:1;min-width:240px;font-family:inherit;font-size:14px;padding:9px 12px;
+  border:1px solid var(--line);border-radius:5px;background:var(--panel-2);color:var(--ink)}
+.ask-form input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft)}
+.suggest{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 13px}
+.sg{border:1px solid var(--line);background:var(--panel-2);border-radius:999px;padding:3.5px 11px;
+  font-size:11.5px;cursor:pointer;color:var(--ink-2)}
+.sg:hover{border-color:var(--teal);color:var(--teal)}
+.thread{padding:0 16px 16px;display:flex;flex-direction:column;gap:14px;max-height:560px;overflow-y:auto}
+.qa{border-top:1px solid var(--line-soft);padding-top:13px}
+.qa:first-child{border-top:none}
+.q{font-family:var(--disp);font-size:14.5px;font-weight:600;margin-bottom:6px;display:flex;gap:8px}
+.q::before{content:"Q";color:var(--teal);font-size:11px;letter-spacing:.1em;padding-top:3px}
+.a{font-size:13px;line-height:1.65;color:var(--ink-2)}
+.a p{margin:0 0 7px}
+.a b{color:var(--ink)}
+.a code{font-family:var(--mono);font-size:12px;background:var(--sunken);padding:1px 5px;
+  border-radius:3px;color:var(--ink)}
+.a pre{font-family:var(--mono);font-size:11.5px;background:var(--sunken);padding:8px 10px;
+  border-radius:5px;overflow-x:auto;margin:6px 0;line-height:1.6;border-left:2px solid var(--teal-line)}
+.a ul{margin:5px 0;padding-left:19px}
+.a li{margin-bottom:3px}
+.a table{border-collapse:collapse;font-size:12px;margin:6px 0;width:100%}
+.a table th,.a table td{border:1px solid var(--line);padding:4px 8px;text-align:right}
+.a table th{background:var(--sunken);font-family:var(--disp);font-size:11px;letter-spacing:.05em}
+.a table td:first-child,.a table th:first-child{text-align:left}
+
+.foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);font-size:11.5px;
+  color:var(--ink-3);line-height:1.65}
+.foot b{color:var(--ink-2)}
+</style>
+
+<div class="masthead">
+  <div class="masthead-in">
+    <div class="brand">
+      <div class="eyebrow">Stainless alloy &amp; process design</div>
+      <h1>강종 설계 워크벤치</h1>
+      <p>Austenite · Martensite · Semi-Ferrite · Fully-Ferrite 4개 계열. 성분 13종과 열연·냉연 공정 13항목을 입력하면 기계적 성질과 내식성을 예측하고, 반대로 물성 목표를 입력하면 성분 또는 제조조건을 역산합니다.</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="btnPrices">원료 단가</button>
+      <button class="btn" id="btnNi">Ni 절감 최적화</button>
+      <button class="btn pri" id="btnFix">자동 개선</button>
+      <button class="btn" id="btnReset">초기화</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <section class="grp" id="priceBox" hidden
+    style="background:var(--panel);border:1px solid var(--line);border-radius:8px;
+           box-shadow:var(--shadow);margin-bottom:20px"></section>
+
+  <nav class="tabbar" id="tabs" role="tablist" aria-label="강종 계열"></nav>
+
+  <section class="board" id="board" hidden>
+    <div class="board-head">
+      <h2>페르소나 검증</h2>
+      <span class="board-sub">레드 · 블루 · 그린 · 옐로 · 블랙 5인이 현재 4개 계열 설계를 동시에 심사합니다. 점수는 각 계열의 야금 제약·조업 가능성·원가·규격 적합을 실시간 계산한 결과이며, 전원 9.0 이상이어야 설계 승인으로 판정합니다.</span>
+      <div class="gate" id="gate">—</div>
+    </div>
+    <div class="personas" id="personas"></div>
+  </section>
+
+  <div id="bays"></div>
+
+  <section class="ask">
+    <div class="ask-head">
+      <h2>설계 문의</h2>
+      <p>현재 4개 계열의 실제 계산 상태를 읽어 답변합니다. 계열명이나 강종번호를 함께 쓰면 그 기준으로 답합니다.</p>
+    </div>
+    <form class="ask-form" id="askForm">
+      <input id="askInput" placeholder="예) 304 델타페라이트가 왜 이 값인가?" autocomplete="off">
+      <button class="btn pri" type="submit">질문</button>
+    </form>
+    <div class="suggest" id="suggest"></div>
+    <div class="thread" id="thread"></div>
+  </section>
+
+
+  <div class="foot">
+    <b>모델 고지</b> — 본 도구는 공개 문헌의 회귀식(Hammar–Svensson, Hull, WRC-1992, Nohara, Angel, Eichelman–Hull, Andrews, Pickering, Hall–Petch, Kaltenhauser, γmax 회귀, PREN)과, 이를 AISI 304/430/410의 실측 대표값에 맞춰 보정한 내부 상관식을 조합한 <b>준경험적 대리모델(surrogate)</b>입니다. 상평형 계산은 Fe–Cr–Ni 유사이원계 단면을 온도의 함수로 매개변수화한 근사이며 Thermo-Calc 등 CALPHAD 엔진의 직접 호출이 아닙니다. 실제 조업 적용 전 반드시 실험로 검증이 필요합니다.
+  </div>
+</div>
+<script>
+/* ══════════════════════════════════════════════════════════════
+   1. 원소 · 공정 항목 정의
+   ══════════════════════════════════════════════════════════════ */
+const EL = [
+  {k:'C', n:'C',  s:0.005, d:3, min:0.005,max:0.20},
+  {k:'Si',n:'Si', s:0.01,  d:2, min:0.05, max:1.20},
+  {k:'Mn',n:'Mn', s:0.01,  d:2, min:0.10, max:2.20},
+  {k:'P', n:'P',  s:0.001, d:3, min:0.008,max:0.045},
+  {k:'S', n:'S',  s:0.0005,d:4, min:0.0002,max:0.030},
+  {k:'Cr',n:'Cr', s:0.05,  d:2, min:10.0, max:22.0},
+  {k:'Ni',n:'Ni', s:0.05,  d:2, min:0.00, max:12.0},
+  {k:'Mo',n:'Mo', s:0.01,  d:2, min:0.00, max:2.50},
+  {k:'Ti',n:'Ti', s:0.005, d:3, min:0.000,max:0.500},
+  {k:'Nb',n:'Nb', s:0.005, d:3, min:0.000,max:0.700},
+  {k:'Cu',n:'Cu', s:0.01,  d:2, min:0.00, max:1.50},
+  {k:'N', n:'N',  s:0.005, d:3, min:0.005,max:0.150},
+  {k:'Al',n:'Al', s:0.001, d:3, min:0.001,max:0.080}
+];
+const PR = [
+  {k:'slab',  n:'Slab 두께', u:'mm',    s:5,   d:0, min:150, max:260, st:'hot'},
+  {k:'rhfT',  n:'가열로',    u:'℃',    s:5,   d:0, min:1120,max:1300, st:'hot'},
+  {k:'rdt',   n:'RDT',       u:'℃',    s:5,   d:0, min:930, max:1180, st:'hot'},
+  {k:'fdt',   n:'FDT',       u:'℃',    s:5,   d:0, min:760, max:1060, st:'hot'},
+  {k:'hrT',   n:'열연 두께', u:'mm',    s:0.1, d:2, min:1.8, max:9.0,  st:'hot'},
+  {k:'hrW',   n:'열연 폭',   u:'mm',    s:10,  d:0, min:900, max:1650, st:'hot'},
+  {k:'ct',    n:'CT',        u:'℃',    s:10,  d:0, min:380, max:880,  st:'hot'},
+  {k:'hrAnnT',n:'열연 소둔', u:'℃',    s:5,   d:0, min:680, max:1220, st:'hot'},
+  {k:'hrAnnV',n:'열연 소둔속도',u:'m/min',s:1, d:0, min:6,   max:90,   st:'hot'},
+  {k:'crT',   n:'냉연 두께', u:'mm',    s:0.05,d:2, min:0.25,max:3.2,  st:'cold'},
+  {k:'crW',   n:'냉연 폭',   u:'mm',    s:10,  d:0, min:900, max:1650, st:'cold'},
+  {k:'crAnnT',n:'냉연 소둔', u:'℃',    s:5,   d:0, min:640, max:1220, st:'cold'},
+  {k:'crAnnV',n:'냉연 소둔속도',u:'m/min',s:1, d:0, min:8,   max:160,  st:'cold'}
+];
+const PROP = [
+  {k:'YS', n:'YS',     u:'MPa',     d:0, grp:'mech'},
+  {k:'TS', n:'TS',     u:'MPa',     d:0, grp:'mech'},
+  {k:'EL', n:'EL',     u:'%',       d:1, grp:'mech'},
+  {k:'HV', n:'HV',     u:'HV0.5',   d:0, grp:'mech'},
+  {k:'Ep', n:'공식전위',u:'mV(SCE)',d:0, grp:'corr'},
+  {k:'ic', n:'임계전류밀도',u:'mA/cm²',d:2, grp:'corr'}
+];
+
+/* ── 강종 기준 데이터 (ASTM A240) ───────────────────────────── */
+const GRADES = {
+  '304':{
+    label:'STS 304', family:'austenitic', famKo:'Austenite계',
+    comp:{C:0.050,Si:0.45,Mn:1.10,P:0.030,S:0.0020,Cr:18.20,Ni:8.35,Mo:0.20,
+          Ti:0.005,Nb:0.010,Cu:0.35,N:0.045,Al:0.005},
+    proc:{slab:200,rhfT:1250,rdt:1080,fdt:920,hrT:3.5,hrW:1250,ct:750,
+          hrAnnT:1120,hrAnnV:25,crT:1.00,crW:1240,crAnnT:1090,crAnnV:55},
+    spec:{C:[0,0.080],Si:[0,0.75],Mn:[0,2.00],P:[0,0.045],S:[0,0.030],
+          Cr:[18.0,20.0],Ni:[8.0,10.5],N:[0,0.10]},
+    mech:{YS:[205,null],TS:[515,null],EL:[40,null],HV:[null,210]},
+    knobs:{C:[0.020,0.075],Si:[0.20,0.70],Mn:[0.60,1.90],Cr:[18.05,19.90],
+           Ni:[8.02,10.40],Mo:[0.02,0.55],Cu:[0.05,1.00],N:[0.020,0.095],
+           Nb:[0.000,0.045],Ti:[0.000,0.045],S:[0.0004,0.008],P:[0.015,0.038]},
+    pk:{rhfT:[1200,1290],rdt:[1000,1120],fdt:[880,1000],ct:[550,820],hrT:[2.5,6.0],
+        hrAnnT:[1050,1180],hrAnnV:[15,60],crAnnT:[1020,1160],crAnnV:[25,120]},
+    refCost:2745, demand:'세계 STS 수요의 약 45 % — 최대 범용 강종',
+    note:'용체화 소둔 후 완전 오스테나이트. 가공유기 마르텐사이트(TRIP)가 연신·인장을 지배.'
+  },
+  '430':{
+    label:'STS 430', family:'ferritic', famKo:'Semi-Ferrite계',
+    comp:{C:0.045,Si:0.30,Mn:0.40,P:0.028,S:0.0015,Cr:16.30,Ni:0.20,Mo:0.02,
+          Ti:0.005,Nb:0.010,Cu:0.08,N:0.040,Al:0.010},
+    proc:{slab:200,rhfT:1220,rdt:1050,fdt:850,hrT:4.00,hrW:1250,ct:720,
+          hrAnnT:880,hrAnnV:40,crT:0.80,crW:1240,crAnnT:850,crAnnV:60},
+    spec:{C:[0,0.12],Si:[0,1.00],Mn:[0,1.00],P:[0,0.040],S:[0,0.030],
+          Cr:[16.0,18.0],Ni:[0,0.75]},
+    mech:{YS:[205,null],TS:[450,null],EL:[22,null],HV:[null,192]},
+    knobs:{C:[0.015,0.10],Si:[0.15,0.90],Mn:[0.20,0.90],Cr:[16.05,17.90],
+           Ni:[0.05,0.60],Mo:[0.01,0.45],Cu:[0.02,0.45],N:[0.010,0.055],
+           Nb:[0.000,0.45],Ti:[0.000,0.35],S:[0.0004,0.008],P:[0.015,0.035]},
+    pk:{rhfT:[1150,1260],rdt:[980,1100],fdt:[800,920],ct:[600,800],hrT:[3.0,6.5],
+        hrAnnT:[820,960],hrAnnV:[20,70],crAnnT:[800,930],crAnnV:[30,130]},
+    refCost:1275, demand:'세계 STS 수요의 약 20 % — 400계 최대 품목, 가전/주방',
+    note:'γmax·Kaltenhauser 인자가 조직을, 리징·r값이 성형성을 좌우. 비안정화재는 예민화에 취약.'
+  },
+  '410':{
+    label:'STS 410', family:'martensitic', famKo:'Martensite계',
+    comp:{C:0.120,Si:0.40,Mn:0.50,P:0.025,S:0.0020,Cr:12.50,Ni:0.30,Mo:0.03,
+          Ti:0.003,Nb:0.005,Cu:0.10,N:0.035,Al:0.008},
+    proc:{slab:200,rhfT:1230,rdt:1060,fdt:880,hrT:4.50,hrW:1250,ct:730,
+          hrAnnT:780,hrAnnV:20,crT:1.20,crW:1240,crAnnT:760,crAnnV:30},
+    spec:{C:[0.08,0.15],Si:[0,1.00],Mn:[0,1.00],P:[0,0.040],S:[0,0.030],
+          Cr:[11.5,13.5],Ni:[0,0.75]},
+    mech:{YS:[205,null],TS:[450,null],EL:[20,null],HV:[null,192]},
+    knobs:{C:[0.085,0.145],Si:[0.20,0.90],Mn:[0.30,0.90],Cr:[11.6,13.4],
+           Ni:[0.05,0.70],Mo:[0.01,0.45],Cu:[0.02,0.35],N:[0.010,0.045],
+           Nb:[0.000,0.10],Ti:[0.000,0.10],S:[0.0004,0.008],P:[0.015,0.035]},
+    pk:{rhfT:[1160,1270],rdt:[1000,1110],fdt:[840,950],ct:[600,800],hrT:[3.5,7.0],
+        hrAnnT:[720,830],hrAnnV:[12,50],crAnnT:[700,940],crAnnV:[15,90]},
+    refCost:1255, demand:'세계 STS 수요의 약 4 % — 커틀러리·밸브·체결류',
+    note:'최종 소둔온도가 Ac1을 넘는 순간 오스테나이트→마르텐사이트로 물성이 급변.'
+  },
+  '439':{
+    label:'STS 439', family:'ferritic', famKo:'Fully-Ferrite계',
+    comp:{C:0.012,Si:0.35,Mn:0.30,P:0.025,S:0.0012,Cr:17.40,Ni:0.25,Mo:0.02,
+          Ti:0.310,Nb:0.010,Cu:0.08,N:0.012,Al:0.045},
+    proc:{slab:200,rhfT:1200,rdt:1040,fdt:830,hrT:4.00,hrW:1250,ct:700,
+          hrAnnT:900,hrAnnV:45,crT:0.70,crW:1240,crAnnT:950,crAnnV:55},
+    spec:{C:[0,0.030],Si:[0,1.00],Mn:[0,1.00],P:[0,0.040],S:[0,0.030],
+          Cr:[17.0,19.0],Ni:[0,0.50],N:[0,0.030],Ti:[0.20,1.10],Al:[0,0.15]},
+    mech:{YS:[205,null],TS:[415,null],EL:[22,null],HV:[null,183]},
+    knobs:{C:[0.006,0.028],Si:[0.15,0.90],Mn:[0.15,0.90],Cr:[17.05,18.90],
+           Ni:[0.05,0.45],Mo:[0.01,0.45],Cu:[0.02,0.45],N:[0.006,0.028],
+           Nb:[0.000,0.55],Ti:[0.200,0.90],S:[0.0004,0.008],P:[0.015,0.035]},
+    pk:{rhfT:[1150,1250],rdt:[980,1090],fdt:[790,900],ct:[580,780],hrT:[3.0,6.0],
+        hrAnnT:[850,1000],hrAnnV:[25,75],crAnnT:[880,1010],crAnnV:[30,120]},
+    refCost:1372, demand:'세계 STS 수요의 약 3 % — 자동차 배기계·저수조·건재',
+    note:'Ti 완전 안정화로 γmax = 0. 고용 침입형 원소가 없어 r값이 높고 예민화가 원리적으로 차단.'
+  }
+};
+/* 탭 표시 순서 */
+const ORDER = ['304','410','430','439'];
+const PROC_KNOBS = ['rhfT','rdt','fdt','ct','hrT','hrAnnT','hrAnnV','crAnnT','crAnnV'];
+
+/* 원료 단가 (USD / kg 함유원소) */
+const PRICE0 = {Cr:2.20,Ni:16.50,Mo:58.0,Mn:1.55,Si:1.90,Ti:7.20,Nb:26.0,
+                Cu:9.60,N:8.50,Al:2.60,C:0.90,Fe:0.47};
+const COST_COLOR = {Ni:'#5B7FB8',Cr:'#0E6E7A',Fe:'#8A96A0',Mo:'#8E5AA8',
+                    Cu:'#B0703A',기타:'#B05810',정련:'#A93030',가공:'#5E6E62'};
+
+/* ══════════════════════════════════════════════════════════════
+   2. 야금 회귀식
+   ══════════════════════════════════════════════════════════════ */
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+const L10=Math.log10;
+
+// 당량 — Hammar & Svensson (1979)
+const creqHS=c=>c.Cr+1.37*c.Mo+1.5*c.Si+2*c.Nb+3*c.Ti;
+const nieqHS=c=>c.Ni+22*c.C+14.2*c.N+0.31*c.Mn+c.Cu;
+// 당량 — WRC-1992
+const creqWRC=c=>c.Cr+c.Mo+0.7*c.Nb;
+const nieqWRC=c=>c.Ni+35*c.C+20*c.N+0.25*c.Cu;
+const ferriteNo=c=>Math.max(0,3.34*creqWRC(c)-2.46*nieqWRC(c)-28.6);
+
+// δ-페라이트: Hull 식 + 온도 의존 경계 b(T)
+const bT=T=>6.7+(1300-T)*0.0157;
+const deltaAt=(c,T)=>Math.max(0,3*(creqHS(c)-0.93*nieqHS(c)-bT(T)));
+
+// ASTM 결정립도 번호 ↔ 평균 입경(µm)
+const astmG=d=>-6.6438*L10(d/1000)-3.288;
+
+// Md30 — Nohara (1977) / Angel (1954)
+const md30N=(c,d)=>551-462*(c.C+c.N)-9.2*c.Si-8.1*c.Mn-13.7*c.Cr
+                   -29*(c.Ni+c.Cu)-18.5*c.Mo-68*c.Nb-1.42*(astmG(d)-8);
+const md30A=c=>413-462*(c.C+c.N)-9.2*c.Si-8.1*c.Mn-13.7*c.Cr-9.5*c.Ni-18.5*c.Mo;
+// Ms — Eichelman & Hull (오스테나이트계) / Andrews (마르텐사이트계)
+const msAus=c=>1305-1665*(c.C+c.N)-28*c.Si-33*c.Mn-42*c.Cr-61*c.Ni;
+const msMar=c=>539-423*c.C-30.4*c.Mn-17.7*c.Ni-12.1*c.Cr-7.5*c.Mo-7.5*c.Si;
+
+// 400계 지표
+const gammaMax=c=>cl(420*c.C+470*c.N+23*c.Ni+9*c.Cu+7*c.Mn-11.5*c.Cr-11.5*c.Si
+                     -12*c.Mo-47*c.Nb-49*c.Ti-52*c.Al+189,0,100);
+const kffK=c=>c.Cr+6*c.Si+8*c.Ti+4*c.Mo+2*c.Al-2*c.Mn-4*c.Ni-40*(c.C+c.N);
+const ac1T=c=>720+12*c.Cr+25*c.Si+30*c.Mo+40*c.Nb+60*c.Ti+45*c.Al
+              -25*c.Mn-30*c.Ni-15*c.Cu-250*c.C-400*c.N;
+const ac3T=c=>ac1T(c)+90-200*c.C+3*c.Cr;
+const prenV=c=>c.Cr+3.3*c.Mo+16*c.N;
+
+// 안정화: Ti가 N을 먼저(TiN), 남은 Ti와 Nb가 C를 고정
+function stabilize(c){
+  let ti=c.Ti;
+  const nTi=Math.min(c.N,ti/3.42); ti-=3.42*nTi;
+  const cTi=Math.min(c.C,ti/4.0);
+  const cNb=Math.min(c.C-cTi,c.Nb/7.75);
+  return {Ceff:Math.max(0,c.C-cTi-cNb), Neff:Math.max(0,c.N-nTi)};
+}
+
+/* ── 결정립 성장 (Beck 형) ─────────────────────────────────── */
+const GG={austenitic:{n:2.5,Q:280000,k0:6.0e12},
+          ferritic  :{n:2.0,Q:230000,k0:6.56e11}};
+function grow(d0,TC,t,fam,pin){
+  const g=GG[fam==='austenitic'?'austenitic':'ferritic'];
+  const r=g.k0*Math.exp(-g.Q/(8.314*(TC+273.15)))*t*pin;
+  return Math.pow(Math.pow(d0,g.n)+r,1/g.n);
+}
+// ferrite 중 C 고용도 근사 (wt%)
+const csolF=T=>0.008*Math.exp((T-700)/220);
+/* ══════════════════════════════════════════════════════════════
+   3. 순방향 모델 : 성분 + 제조조건 → 조직 → 물성 → 원가
+   ══════════════════════════════════════════════════════════════ */
+function compute(key, comp, proc, prices){
+  const G=GRADES[key], fam=G.family, c=comp, p=proc, P=prices||PRICE0;
+  const R={key,fam,eq:[]};
+  const eq=(h,f,t,s)=>R.eq.push({h,f,t,s});
+
+  /* ── 3-1 압하율 · 소둔 유효시간 ─────────────────────────── */
+  const hrRed=(p.slab-p.hrT)/p.slab*100;
+  const crRed=(p.hrT-p.crT)/p.hrT*100;
+  const tHR=2700/p.hrAnnV, tCR=2700/p.crAnnV;   // 유효 소킹길이 45 m 가정
+  R.hrRed=hrRed; R.crRed=crRed; R.tHR=tHR; R.tCR=tCR;
+
+  /* ── 3-2 안정화 · 상평형 지표 ───────────────────────────── */
+  const {Ceff,Neff}=stabilize(c);
+  R.Ceff=Ceff; R.Neff=Neff;
+  R.creq=creqHS(c); R.nieq=nieqHS(c);
+  R.dCast=deltaAt(c,1300);            // 슬라브·재가열역 (열간연성)
+  R.dHot =deltaAt(c,Math.min(p.rhfT,1300));
+  R.FN=ferriteNo(c);
+  R.gmax=gammaMax(c); R.kff=kffK(c);
+  R.ac1=ac1T(c); R.ac3=ac3T(c);
+  R.pren=prenV(c);
+  R.msMar=msMar(c);
+
+  /* ── 3-3 결정립 이력 ────────────────────────────────────── */
+  const pin=1/(1+12*(c.Nb+c.Ti)+3*Ceff);
+  R.pin=pin;
+  const hbBase=fam==='austenitic'?22:55;
+  R.dHB=hbBase*Math.exp((p.fdt-900)/130)*(1+Math.max(0,p.ct-550)/1200)
+        *Math.pow(60/Math.max(30,hrRed),0.3);
+
+  // γmax≈0 인 완전 페라이트계는 오스테나이트가 생기지 않으므로 Ac1 분기 자체가 무의미
+  const canTransform = R.gmax > 5;
+  const subHR = fam!=='austenitic' && canTransform && p.hrAnnT < R.ac1;
+  const subCR = fam!=='austenitic' && canTransform && p.crAnnT < R.ac1;
+  // 열연 소둔 후
+  if(subHR){ R.dHRA=grow(14,p.hrAnnT,tHR,fam,0.35); }
+  else     { R.dHRA=grow(R.dHB*0.6,p.hrAnnT,tHR,fam,pin); }
+  // 냉연 재결정 초기립 → 최종립
+  let d0=(fam==='austenitic'?4.5:6.0)+0.10*R.dHRA*Math.pow(70/Math.max(20,crRed),0.8);
+  if(subCR) d0=Math.max(d0,12);
+  R.d0=d0;
+  R.d=grow(d0,p.crAnnT,tCR,fam,subCR?0.35:pin);
+  R.G=astmG(R.d);
+
+  /* ── 3-4 δ 잔류 · Md30 ──────────────────────────────────── */
+  R.dFin = fam==='austenitic' ? deltaAt(c,p.crAnnT) : null;
+  R.md30 = fam==='austenitic' ? md30N(c,R.d) : null;
+  R.md30A= fam==='austenitic' ? md30A(c) : null;
+  R.msA  = fam==='austenitic' ? msAus(c) : null;
+  R.V30  = fam==='austenitic' ? 50/(1+Math.exp(-(R.md30-25)/30)) : 0;
+
+  /* ── 3-5 예민화 (Cr 결핍) ───────────────────────────────── */
+  const tCool=20*Math.sqrt(p.crT)*Math.sqrt(50/p.crAnnV);
+  R.tCool=tCool;
+  let dosC, tNose;
+  if(fam==='austenitic'){
+    dosC=Ceff;
+    tNose=Math.pow(10,-3.6-4.6*L10(Math.max(dosC,1e-4)));
+    R.DOS=100*Math.pow(cl(tCool/tNose,0,1),1.5);
+  }else{
+    dosC=Math.min(Ceff,csolF(p.crAnnT));
+    tNose=Math.pow(10,-5.6-4.6*L10(Math.max(Ceff,1e-4)));
+    R.DOS=100*cl(dosC/0.05,0,1)*Math.pow(cl(tCool/tNose,0,1),0.4);
+  }
+  R.tNose=tNose; R.dosC=dosC;
+
+  /* ── 3-6 마르텐사이트 변태 (400계) ──────────────────────── */
+  R.fm=0; R.Cg=0;
+  if(fam!=='austenitic' && canTransform && p.crAnnT>R.ac1){
+    const fg=cl((p.crAnnT-R.ac1)/Math.max(1,R.ac3-R.ac1),0,1)*R.gmax/100;
+    R.Cg=Math.min(c.C/Math.max(fg,0.05),0.50);
+    const rate=20*(p.crAnnV/50)/Math.max(0.25,p.crT);   // ℃/s 근사
+    R.coolRate=rate;
+    R.fm=fg*cl(rate/1.0,0.35,1);                        // 410은 공랭경화형
+  }
+
+  /* ── 3-7 기계적 성질 ────────────────────────────────────── */
+  const dmm=R.d/1000, hp=Math.pow(dmm,-0.5);
+  let YS,TS,ELg,HV;
+  if(fam==='austenitic'){
+    const dF=R.dFin;
+    const pk=4.4+23*c.C+32*c.N+0.24*c.Cr+0.94*c.Mo+1.3*c.Si+2.6*c.Nb
+             +1.7*c.Ti+0.82*c.Al+0.16*dF+0.46*hp;
+    R.ysPick=15.4*pk;
+    YS=R.ysPick+38+18;                       // 조질압연 + 계열보정
+    const pt=29+35*c.C+55*c.N+2.4*c.Si+0.11*c.Ni+1.2*c.Mo+5*c.Nb+3*c.Ti
+             +1.2*c.Al+0.14*dF+0.82*hp;
+    R.tsPick=15.4*pt;
+    R.trip=3.0*R.V30;
+    TS=R.tsPick+R.trip+12;
+    ELg=58-0.008*Math.pow(R.md30-10,2)-0.030*(YS-250)-1.5*dF
+        +cl(0.05*(R.d-25),-1.5,2.5)-2.5*Math.max(0,0.6-p.crT);
+    HV=0.21*TS+0.09*YS+5;
+  }else{
+    const freeI=Math.min(Ceff+Neff, subCR?0.002:0.008);
+    R.freeI=freeI;
+    const ysF=55+3.7*c.Cr+83*c.Si+32*c.Mn+11*c.Mo+690*c.P+5000*freeI
+              +18.97*hp+180*Math.min(0.5,c.Nb)
+              +(fam==='martensitic'?-35:0);
+    const tsF=ysF+175+900*freeI;
+    R.rbar=cl(1.00+0.010*(crRed-60)+(p.hrAnnT>800?0.5:0)-6*(c.C+c.N)
+              +1.0*Math.min(0.4,c.Nb+c.Ti),0.7,1.95);
+    R.ridge=cl(0.6*(R.dHB/40)+0.5*(70/Math.max(20,crRed))+0.4*(p.fdt-800)/100
+               -(p.hrAnnT>850?0.5:0),0,10);
+    const elF=31-0.045*(ysF-300)+4*(R.rbar-1.0)-0.35*R.ridge-800*freeI
+              -(fam==='martensitic'?6:0);
+    if(R.fm>0.01){
+      const hvM=Math.min(700,250+1400*R.Cg), tsM=3.3*hvM, ysM=0.78*tsM;
+      R.hvM=hvM;
+      YS=ysF*(1-R.fm)+ysM*R.fm; TS=tsF*(1-R.fm)+tsM*R.fm;
+      ELg=elF*Math.pow(1-R.fm,1.5)+6*R.fm;
+    }else{ YS=ysF; TS=tsF; ELg=elF; }
+    R.ysF=ysF; R.tsF=tsF;
+    HV=0.26*TS+0.05*YS+14;
+  }
+  R.YS=YS; R.TS=TS; R.EL=Math.max(2,ELg); R.HV=HV;
+
+  /* ── 3-8 내식성 ─────────────────────────────────────────── */
+  const famOff={austenitic:0,ferritic:-50,martensitic:-60}[fam];
+  R.dS=-60*(L10(Math.max(c.S,1e-5))+3.7);
+  R.dSens=-1.8*R.DOS;
+  R.dTi=-100*Math.max(0,c.Ti-0.05);
+  R.dGr=-0.4*(R.d-25);
+  R.Ep=-75+21*R.pren+famOff+R.dS+R.dSens+R.dTi+R.dGr;
+  R.famOff=famOff;
+  R.logIc=5.35-0.105*c.Cr-0.16*c.Mo-0.22*c.Cu-0.045*c.Ni-0.06*c.Si
+          +1.6*c.C+0.010*R.DOS;
+  R.ic=Math.pow(10,R.logIc)/1000;               // µA→mA/cm²
+  R.mu = fam==='austenitic' ? 1.002+0.02*(R.dFin||0) : null;
+
+  /* ── 3-9 원가 ───────────────────────────────────────────── */
+  let alloy=0, alloyPct=0; const brk={};
+  ['Cr','Ni','Mo','Mn','Si','Ti','Nb','Cu','N','Al','C'].forEach(e=>{
+    const v=c[e]*10*P[e]; brk[e]=v; alloy+=v; alloyPct+=c[e];
+  });
+  const feFrac=(100-alloyPct-c.P-c.S)/100;
+  brk.Fe=feFrac*1000*P.Fe; alloy+=brk.Fe;
+  const sPen=c.S<0.010?45*L10(0.010/Math.max(c.S,2e-4)):0;
+  const pPen=c.P<0.030?30*L10(0.030/Math.max(c.P,5e-3)):0;
+  const cPen=c.C<0.030?1500*(0.030-c.C):0;
+  const nPen=c.N<0.020?900*(0.020-c.N):0;
+  const refine=sPen+pPen+cPen+nPen;
+
+  const melt=175;
+  const hot=55+0.09*Math.max(0,p.rhfT-1150)+8*(p.slab/200);
+  const hrAnn=16*Math.pow(p.hrAnnT/900,1.9)+850/p.hrAnnV;
+  const cold=22+0.75*crRed+30*Math.max(0,0.8-p.crT)/0.4;
+  const crAnn=16*Math.pow(p.crAnnT/900,1.9)+850/p.crAnnV;
+  const pickle=12+0.02*Math.max(0,p.hrAnnT-800)+0.02*Math.max(0,p.crAnnT-800);
+  const yld=40*(1250/p.crW-1)+15;
+  const conv=melt+hot+hrAnn+cold+crAnn+pickle+yld;
+
+  R.cost={alloy,refine,conv,total:alloy+refine+conv,brk,
+          sPen,pPen,cPen,nPen,melt,hot,hrAnn,cold,crAnn,pickle,yld};
+
+  /* ── 3-10 근거 기록 ─────────────────────────────────────── */
+  eq('Cr·Ni 당량 (Hammar–Svensson)',
+     'Creq = Cr+1.37Mo+1.5Si+2Nb+3Ti\nNieq = Ni+22C+14.2N+0.31Mn+Cu',
+     `Creq = ${R.creq.toFixed(2)}  ·  Nieq = ${R.nieq.toFixed(2)}  ·  비 = ${(R.creq/R.nieq).toFixed(3)}`,
+     'Hammar & Svensson, Solidification and Casting of Metals (1979)');
+  eq('δ-페라이트 (Hull 식 + 온도의존 경계)',
+     'δ% = 3·[Creq − 0.93·Nieq − b(T)]\nb(T) = 6.7 + (1300 − T)×0.0157',
+     `1300 ℃ : ${R.dCast.toFixed(1)} %  (열간연성 지배)`
+     +(R.dFin!==null?`\n최종소둔 ${p.crAnnT} ℃ : ${R.dFin.toFixed(2)} %`:''),
+     'Hull(1973)의 δ 계산식에 γ 안정성의 온도 의존성을 부가한 내부 상관식');
+  eq('용접부 페라이트수 (WRC-1992)',
+     'Creq = Cr+Mo+0.7Nb , Nieq = Ni+35C+20N+0.25Cu\nFN ≈ 3.34Creq − 2.46Nieq − 28.6',
+     `FN = ${R.FN.toFixed(1)}`,'WRC-1992 등FN선의 선형근사');
+  if(fam==='austenitic'){
+    eq('Md30 — 가공유기 마르텐사이트 (Nohara)',
+       'Md30 = 551 − 462(C+N) − 9.2Si − 8.1Mn − 13.7Cr\n        − 29(Ni+Cu) − 18.5Mo − 68Nb − 1.42(ν−8)',
+       `Md30 = ${R.md30.toFixed(1)} ℃  (Angel 식: ${R.md30A.toFixed(1)} ℃)\n`
+       +`ν = ASTM ${R.G.toFixed(1)} → 30 % 변형 시 α′ ${R.V30.toFixed(1)} %`,
+       'Nohara, Ono & Ohashi, Tetsu-to-Hagané 63 (1977)');
+    eq('0.2 % 내력 (Pickering)',
+       'σy = 15.4[4.4+23C+32N+0.24Cr+0.94Mo+1.3Si\n      +2.6Nb+1.7Ti+0.82Al+0.16δ+0.46 d^−½]',
+       `Pickering 기본값 ${R.ysPick.toFixed(0)} MPa + 조질압연 38 + 계열보정 18 = ${YS.toFixed(0)} MPa`,
+       'F.B. Pickering, Physical Metallurgy of Stainless Steel Development (1976)');
+    eq('인장강도 + TRIP 기여',
+       'σu = 15.4[29+35C+55N+2.4Si+0.11Ni+1.2Mo+…+0.82 d^−½]\nΔσTRIP = 3.0 × V(α′)30%',
+       `${R.tsPick.toFixed(0)} + ${R.trip.toFixed(0)}(TRIP) + 12 = ${TS.toFixed(0)} MPa`,
+       'Pickering 식 + Md30 기반 TRIP 항');
+    eq('Ms (Eichelman & Hull)',
+       'Ms = 1305 − 1665(C+N) − 28Si − 33Mn − 42Cr − 61Ni',
+       `Ms = ${R.msA.toFixed(0)} ℃ → 실온에서 열적 마르텐사이트 없음`,
+       'Eichelman & Hull, Trans. ASM 45 (1953)');
+  }else{
+    eq('γmax — 최대 오스테나이트량',
+       '%γmax = 420C+470N+23Ni+9Cu+7Mn−11.5Cr−11.5Si\n          −12Mo−47Nb−49Ti−52Al+189',
+       `γmax = ${R.gmax.toFixed(1)} %`,'페라이트계 STS γmax 회귀식');
+    eq('Kaltenhauser 페라이트 인자',
+       'KFF = Cr+6Si+8Ti+4Mo+2Al−2Mn−4Ni−40(C+N)',
+       `KFF = ${R.kff.toFixed(2)} — 13.5 미만이면 냉각 중 마르텐사이트 생성`,
+       'Kaltenhauser, Metals Eng. Quarterly (1971)');
+    eq('변태점 Ac1 / Ac3',
+       'Ac1 = 720+12Cr+25Si+30Mo+40Nb+60Ti+45Al\n       −25Mn−30Ni−15Cu−250C−400N',
+       `Ac1 = ${R.ac1.toFixed(0)} ℃ , Ac3 = ${R.ac3.toFixed(0)} ℃\n`
+       +`냉연소둔 ${p.crAnnT} ℃ → ${p.crAnnT<R.ac1?'아임계 (완전 연화)':'임계역 이상 → 마르텐사이트 '+(R.fm*100).toFixed(0)+' %'}`,
+       'AISI 409/410/420/430 문헌 Ac1 실측값에 보정한 내부 상관식');
+    eq('Ms (Andrews)','Ms = 539 − 423C − 30.4Mn − 17.7Ni − 12.1Cr − 7.5Mo − 7.5Si',
+       `Ms = ${R.msMar.toFixed(0)} ℃`,'K.W. Andrews, JISI 203 (1965)');
+    eq('내력 — Hall–Petch + 고용강화',
+       'σy = 55+3.7Cr+83Si+32Mn+11Mo+690P\n      +5000(Cfree+Nfree)+18.97 d^−½ +180Nb+60Ti',
+       `σy(페라이트) = ${R.ysF.toFixed(0)} MPa , d = ${R.d.toFixed(1)} µm (ASTM ${R.G.toFixed(1)})`
+       +(R.fm>0.01?`\n마르텐사이트 ${(R.fm*100).toFixed(0)} % 혼합 → ${YS.toFixed(0)} MPa`:''),
+       'ky = 0.6 MPa·m^½ (BCC), 고용강화계수는 페라이트계 문헌값');
+    eq('성형성 지표','r̄ = f(냉간압하율, 열연소둔, 고용 C+N, Nb+Ti)\n리징 = f(열연립경, 압하율, FDT)',
+       `r̄ = ${R.rbar.toFixed(2)} , 리징지수 = ${R.ridge.toFixed(1)} / 10`,
+       '{111} 재결정집합조직 형성 인자 기반 내부 지수');
+  }
+  eq('결정립 성장 (Beck 형)',
+     `d^${GG[fam==='austenitic'?'austenitic':'ferritic'].n} − d₀^n = k₀·exp(−Q/RT)·t·Z\n`
+     +`Q = ${GG[fam==='austenitic'?'austenitic':'ferritic'].Q/1000} kJ/mol , Z = Zener 핀닝`,
+     `열연판 ${R.dHB.toFixed(0)} → 열연소둔 ${R.dHRA.toFixed(0)} → 재결정 ${d0.toFixed(1)} → 최종 ${R.d.toFixed(1)} µm\n`
+     +`소둔 유효시간 = 45 m ÷ ${p.crAnnV} m/min = ${tCR.toFixed(0)} s , Z = ${(subCR?0.35:pin).toFixed(2)}`,
+     '유효 소킹길이 45 m 가정');
+  eq('내공식성 (PREN 기반)',
+     'PREN = Cr + 3.3Mo + 16N\nEpit = −75 + 21·PREN + 계열보정 + ΔS + Δ예민화 + ΔTi + Δ결정립',
+     `PREN ${R.pren.toFixed(1)} → 기본 ${(-75+21*R.pren).toFixed(0)} , 계열 ${famOff} , S ${R.dS.toFixed(0)} , `
+     +`예민화 ${R.dSens.toFixed(0)} , Ti ${R.dTi.toFixed(0)} , 립경 ${R.dGr.toFixed(0)}\n= ${R.Ep.toFixed(0)} mV(SCE)`,
+     'ASTM G61 조건(3.5 % NaCl, 30 ℃) 실측 대표값 회귀');
+  eq('임계전류밀도 (0.5 M H₂SO₄, 30 ℃)',
+     'log₁₀ icrit[µA/cm²] = 5.35 − 0.105Cr − 0.16Mo − 0.22Cu\n   − 0.045Ni − 0.06Si + 1.6C + 0.010·DOS',
+     `log icrit = ${R.logIc.toFixed(2)} → ${R.ic.toFixed(2)} mA/cm²`,
+     '동전위 분극 실측 대표값 회귀 (낮을수록 부동태화 용이)');
+  eq('예민화 지수 (Cr 결핍도)',
+     'Ceff = C − Ti/4 − Nb/7.75  (TiN 우선 고정)\nDOS = f(고용 C, 냉각 체류시간 / TTS 노즈시간)',
+     `Ceff = ${Ceff.toFixed(4)} % , 고용 C = ${dosC.toFixed(4)} %\n`
+     +`850→550 ℃ 체류 ${tCool.toFixed(0)} s vs 노즈 ${tNose.toFixed(1)} s → DOS ${R.DOS.toFixed(0)} / 100`,
+     'TTS 곡선 노즈시간의 C 의존성 근사');
+  eq('성분 원가',
+     'Σ(원소 wt% × 10 kg/t × 단가) + Fe 단가 + 정련 페널티 + 가공비',
+     `합금 ${alloy.toFixed(0)} + 정련 ${refine.toFixed(0)} + 가공 ${conv.toFixed(0)} = ${R.cost.total.toFixed(0)} USD/t\n`
+     +`Ni 기여 ${brk.Ni.toFixed(0)} (${(brk.Ni/alloy*100).toFixed(0)} %) , Cr 기여 ${brk.Cr.toFixed(0)}`,
+     'FeCr·LME Ni·FeMo 등 2025년 수준 단가, 상단 [원료 단가]에서 변경 가능');
+  return R;
+}
+/* ══════════════════════════════════════════════════════════════
+   4. 상태
+   ══════════════════════════════════════════════════════════════ */
+const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},tab:ORDER[0]};
+function initState(){
+  ORDER.forEach(k=>{
+    S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},touched:{},solved:{}};
+    S.log[k]=[];
+  });
+  S.thread=[]; S.chg={};
+}
+const calc=k=>compute(k,S.g[k].comp,S.g[k].proc,S.prices);
+function recalc(){ ORDER.forEach(k=>S.res[k]=calc(k)); }
+
+/* ══════════════════════════════════════════════════════════════
+   5. 야금 제약 (RED 페르소나의 판정 기준)
+   ══════════════════════════════════════════════════════════════ */
+function constraints(k,R){
+  const G=GRADES[k], c=S.g[k].comp, p=S.g[k].proc, out=[];
+  const add=(id,name,val,txt,lv,fix)=>out.push({id,name,val,txt,lv,fix});
+
+  // 규격 성분
+  Object.entries(G.spec).forEach(([e,[lo,hi]])=>{
+    const v=c[e];
+    if(v<lo-1e-9)      add('spec_'+e,`${e} 규격`,v,`${e} ${v} % < A240 하한 ${lo} %`,'no',{t:'comp',e,v:lo});
+    else if(hi!==null&&v>hi+1e-9) add('spec_'+e,`${e} 규격`,v,`${e} ${v} % > A240 상한 ${hi} %`,'no',{t:'comp',e,v:hi});
+  });
+  // 기계적 규격
+  Object.entries(G.mech).forEach(([m,[lo,hi]])=>{
+    const v=R[m], u=PROP.find(x=>x.k===m).u;
+    if(lo!==null&&v<lo) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} < A240 최소 ${lo}`,'no',{t:'prop',e:m,v:lo*1.04});
+    if(hi!==null&&v>hi) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} > A240 최대 ${hi}`,'no',{t:'prop',e:m,v:hi*0.96});
+  });
+  // 열간연성 — δ/γ 이상역을 갖는 계열에만 적용
+  if(R.fam!=='ferritic'){
+    if(R.dCast<2)      add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % < 2 % — 완전 오스테나이트 응고, 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.35});
+    else if(R.dCast>12)add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % > 12 % — 열간압연 중 에지크랙 위험`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.35});
+  }
+  if(R.fam==='austenitic'){
+    if(R.md30>40)  add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ > 40 — 성형 중 α′ 과다, 시효균열·자성 발현`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.30});
+    if(R.md30<-40) add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ < −40 — TRIP 소실로 연신·인장 저하`,'wa',{t:'comp',e:'Ni',v:c.Ni-0.30});
+    if(R.FN<3)     add('fn','용접 FN',R.FN,`FN ${R.FN.toFixed(1)} < 3 — 용접 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.3});
+    if(R.FN>12)    add('fn','용접 FN',R.FN,`FN ${R.FN.toFixed(1)} > 12 — 용접부 취화·σ상 석출 위험`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.3});
+    if(R.dFin>1.0) add('dfin','잔류 δ',R.dFin,`최종 δ ${R.dFin.toFixed(2)} % > 1 % — 성형성·표면품질 저하`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT-25});
+  }
+  if(R.fam==='ferritic'){
+    if(R.gmax>65)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % > 65 — 마르텐사이트 과다로 연성 급락`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.30});
+    if(R.ridge>6)  add('ridge','리징',R.ridge,`리징지수 ${R.ridge.toFixed(1)} / 10 — 성형 후 표면 줄무늬 결함`,'wa',{t:'proc',e:'fdt',v:p.fdt-25});
+    if(R.rbar<0.95)add('rbar','r값',R.rbar,`r̄ ${R.rbar.toFixed(2)} < 0.95 — 심가공 부적합`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+15});
+  }
+  if(R.fam==='martensitic'){
+    if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.145,c.C+0.015)});
+    if(R.msMar<150)add('ms','Ms',R.msMar,`Ms ${R.msMar.toFixed(0)} ℃ < 150 — 잔류 오스테나이트 과다`,'wa',{t:'comp',e:'C',v:Math.max(0.085,c.C-0.012)});
+  }
+  // 공통
+  // 완전 안정화에 필요한 Ti = TiN 소모분(3.42·N) + 잔여 C 고정분(4·Ceff) + 여유
+  const tiNeed=3.42*c.N+4*Math.max(0,c.C-c.Nb/7.75)+0.02;
+  if(R.DOS>30)  add('dos','예민화',R.DOS,
+                    `DOS ${R.DOS.toFixed(0)} / 100 — 입계 Cr 결핍, 내식성 저하`
+                    +(R.fam!=='austenitic'?` (완전 안정화 소요 Ti ≒ ${tiNeed.toFixed(3)} %, 현재 ${c.Ti} %)`:''),'wa',
+                    R.fam==='austenitic'?{t:'proc',e:'crAnnV',v:p.crAnnV+20}
+                                        :{t:'comp',e:'Ti',v:tiNeed});
+  if(R.d>45)    add('grain','결정립',R.d,`d ${R.d.toFixed(0)} µm (ASTM ${R.G.toFixed(1)}) — 오렌지필·강도 저하`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT-25});
+  if(R.d<8)     add('grain','결정립',R.d,`d ${R.d.toFixed(1)} µm — 재결정 불완전 가능`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+25});
+  if(R.pren<11) add('pren','PREN',R.pren,`PREN ${R.pren.toFixed(1)} < 11 — 스테인리스 최소 Cr 요건 미달`,'no',{t:'comp',e:'Cr',v:c.Cr+0.5});
+  return out;
+}
+
+/* ── 조업 가능성 (BLUE) ─────────────────────────────────────── */
+function operability(k){
+  const p=S.g[k].proc, R=S.res[k], out=[];
+  const add=(t,fix)=>out.push({txt:t,fix});
+  if(p.crT>=p.hrT)      add('냉연 두께가 열연 두께 이상 — 압연 불가',{t:'proc',e:'crT',v:p.hrT*0.28});
+  if(p.hrT>=p.slab)     add('열연 두께가 슬라브 이상 — 압연 불가',{t:'proc',e:'hrT',v:4});
+  if(p.fdt>p.rdt)       add('FDT가 RDT보다 높음 — 열이력 모순',{t:'proc',e:'fdt',v:p.rdt-140});
+  if(p.rdt>p.rhfT)      add('RDT가 가열로 온도보다 높음 — 열이력 모순',{t:'proc',e:'rdt',v:p.rhfT-160});
+  if(p.ct>p.fdt)        add('CT가 FDT보다 높음 — 권취 불가',{t:'proc',e:'ct',v:p.fdt-140});
+  if(p.crW>p.hrW)       add('냉연 폭이 열연 폭 초과 — 폭 확장 불가',{t:'proc',e:'crW',v:p.hrW-10});
+  if(R.crRed<40)        add(`냉간압하율 ${R.crRed.toFixed(0)} % < 40 % — 재결정 집합조직 미발달`,{t:'proc',e:'hrT',v:p.crT/0.32});
+  if(R.crRed>92)        add(`냉간압하율 ${R.crRed.toFixed(0)} % > 92 % — 압연하중 한계 초과`,{t:'proc',e:'hrT',v:p.crT/0.15});
+  if(p.crAnnT>1180)     add('냉연 소둔온도가 CAL 설비 한계(1180 ℃) 초과',{t:'proc',e:'crAnnT',v:1160});
+  if(R.tCR<12)          add(`소둔 유효시간 ${R.tCR.toFixed(0)} s < 12 s — 재결정 미완`,{t:'proc',e:'crAnnV',v:150});
+  // 재결정 하한 — 이 아래로는 회복만 일어나 냉연 조직이 그대로 남는다
+  const rxT=R.fam==='austenitic'?1000:(R.fam==='ferritic'?790:700);
+  if(p.crAnnT<rxT) add(`냉연 소둔 ${p.crAnnT} ℃ < 재결정 하한 ${rxT} ℃ — 냉간가공 조직 잔류, 물성 예측 불가`,
+                       {t:'proc',e:'crAnnT',v:rxT+30});
+  if(R.fam!=='austenitic' && p.hrAnnT>R.ac1)
+    add(`열연 소둔 ${p.hrAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ — 소둔 목적(연화)과 반대로 재경화`,
+        {t:'proc',e:'hrAnnT',v:Math.round(R.ac1)-40});
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   6. 역설계 솔버 — 최소원가 탐욕 알고리즘
+   ══════════════════════════════════════════════════════════════ */
+function trial(k,mode,knob,val){
+  const c={...S.g[k].comp}, p={...S.g[k].proc};
+  if(mode==='comp') c[knob]=val; else p[knob]=val;
+  return compute(k,c,p,S.prices);
+}
+function knobList(k,mode){
+  if(mode==='comp'){
+    return Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>({e,lo,hi,
+      st:EL.find(x=>x.k===e).s, d:EL.find(x=>x.k===e).d}));
+  }
+  // 공정 노브는 설비 최대범위가 아니라 강종별 야금학적 조업창(pk) 안에서만 움직인다
+  const win=GRADES[k].pk||{};
+  return PROC_KNOBS.map(e=>{const m=PR.find(x=>x.k===e), w=win[e];
+    return {e,lo:w?Math.max(m.min,w[0]):m.min,hi:w?Math.min(m.max,w[1]):m.max,st:m.s,d:m.d};});
+}
+/* 목적물성 prop 을 target 으로 — mode: 'comp' | 'proc' */
+function solve(k,prop,target,mode){
+  const R0=S.res[k], base=R0[prop];
+  const steps=[], knobs=knobList(k,mode);
+  const cur=()=>mode==='comp'?{...S.g[k].comp}:{...S.g[k].proc};
+
+  // 6-1 민감도 · 단가탄력도
+  const sens=knobs.map(kb=>{
+    const v0=(mode==='comp'?S.g[k].comp:S.g[k].proc)[kb.e];
+    const h=Math.max(kb.st, (kb.hi-kb.lo)/60);
+    const vp=Math.min(kb.hi,v0+h), vm=Math.max(kb.lo,v0-h);
+    if(vp-vm<1e-12) return null;
+    const Rp=trial(k,mode,kb.e,vp), Rm=trial(k,mode,kb.e,vm);
+    const dP=(Rp[prop]-Rm[prop])/(vp-vm);
+    const dC=(Rp.cost.total-Rm.cost.total)/(vp-vm);
+    if(!isFinite(dP)||Math.abs(dP)<1e-9) return null;
+    return {...kb,v0,dP,dC,eff:Math.abs(dP)/(Math.abs(dC)+0.35)};
+  }).filter(Boolean).sort((a,b)=>b.eff-a.eff);
+
+  // 6-2 탐욕 적용 : 효율 높은 노브부터 이분법으로 목표 접근
+  let need=target-base, applied=0; const rejected=[];
+  for(const kb of sens){
+    if(Math.abs(need)<Math.abs(target)*0.004) break;
+    if(applied>=3) break;
+    const dir=Math.sign(need)*Math.sign(kb.dP);
+    let lo=dir>0?kb.v0:kb.lo, hi=dir>0?kb.hi:kb.v0;
+    if(dir<0){ lo=kb.lo; hi=kb.v0; } else { lo=kb.v0; hi=kb.hi; }
+    if(hi-lo<1e-9) continue;
+    const f=v=>trial(k,mode,kb.e,v)[prop]-target;
+    const flo=f(lo), fhi=f(hi);
+    let best;
+    if(flo*fhi<=0){                                   // 구간 내 해 존재
+      let a=lo,b=hi;
+      for(let i=0;i<44;i++){const m=(a+b)/2; (f(a)*f(m)<=0)?b=m:a=m;}
+      best=(a+b)/2;
+    }else{                                            // 한계까지 밀어붙임
+      best=Math.abs(flo)<Math.abs(fhi)?lo:hi;
+    }
+    best=cl(Math.round(best/kb.st)*kb.st,kb.lo,kb.hi);
+    if(Math.abs(best-kb.v0)<kb.st*0.5) continue;
+    const before=S.res[k], Rn=trial(k,mode,kb.e,best);
+    // 제약 악화 시 채택 보류
+    if(mode==='comp'){ S.g[k].comp[kb.e]=best; } else { S.g[k].proc[kb.e]=best; }
+    S.res[k]=Rn;
+    const c0=constraints(k,before).filter(x=>x.lv==='no').map(x=>x.id);
+    const cN=constraints(k,Rn).filter(x=>x.lv==='no');
+    const born=cN.filter(x=>!c0.includes(x.id));
+    if(born.length){
+      if(mode==='comp') S.g[k].comp[kb.e]=kb.v0; else S.g[k].proc[kb.e]=kb.v0;
+      S.res[k]=before;
+      rejected.push({knob:kb.e,mode,to:best,d:kb.d,eff:kb.eff,why:born.map(x=>x.txt)});
+      continue;
+    }
+    steps.push({knob:kb.e,mode,from:kb.v0,to:best,d:kb.d,
+      dP:Rn[prop]-before[prop], dC:Rn.cost.total-before.cost.total,
+      sens:kb.dP, unit:mode==='comp'?'wt%':(PR.find(x=>x.k===kb.e).u)});
+    S.g[k].solved[kb.e]=1;
+    need=target-Rn[prop]; applied++;
+  }
+  recalc();
+  return {steps,rejected,achieved:S.res[k][prop],target,base,sens:sens.slice(0,6),prop,mode};
+}
+
+/* ── Ni 절감 최적화 (GREEN) ─────────────────────────────────── */
+function niCut(k){
+  const R=S.res[k]; if(R.fam!=='austenitic') return null;
+  const c0={...S.g[k].comp}, cost0=R.cost.total, md0=R.md30, pr0=R.pren;
+  let best=null;
+  for(let dNi=0.05;dNi<=1.20;dNi+=0.05){
+    const Ni=c0.Ni-dNi; if(Ni<GRADES[k].knobs.Ni[0]) break;
+    for(let dN=0;dN<=0.045;dN+=0.005){
+      const N=Math.min(GRADES[k].knobs.N[1],c0.N+dN);
+      for(let dCu=0;dCu<=0.70;dCu+=0.05){
+        const Cu=Math.min(GRADES[k].knobs.Cu[1],c0.Cu+dCu);
+        for(let dMn=0;dMn<=0.80;dMn+=0.10){
+          const Mn=Math.min(GRADES[k].knobs.Mn[1],c0.Mn+dMn);
+          const c={...c0,Ni:+Ni.toFixed(3),N:+N.toFixed(3),Cu:+Cu.toFixed(3),Mn:+Mn.toFixed(3)};
+          const R2=compute(k,c,S.g[k].proc,S.prices);
+          if(Math.abs(R2.md30-md0)>12) continue;
+          if(R2.pren<pr0-0.25) continue;
+          if(R2.dCast<2||R2.dCast>10) continue;
+          if(R2.FN<3||R2.FN>12) continue;
+          if(R2.YS<GRADES[k].mech.YS[0]||R2.TS<GRADES[k].mech.TS[0]||R2.EL<GRADES[k].mech.EL[0]) continue;
+          if(R2.HV>GRADES[k].mech.HV[1]) continue;
+          const save=cost0-R2.cost.total;
+          if(!best||save>best.save) best={c,R:R2,save,dNi,dN:N-c0.N,dCu:Cu-c0.Cu,dMn:Mn-c0.Mn};
+        }
+      }
+    }
+  }
+  return best&&best.save>8?best:null;
+}
+/* ══════════════════════════════════════════════════════════════
+   7. 페르소나 검증 (10점 만점, 전원 9점 이상이어야 설계 확정)
+   ══════════════════════════════════════════════════════════════ */
+const PERSONAS=[
+  {id:'red',   c:'#B03636', n:'레드',  r:'스테인리스강 설계 권위자'},
+  {id:'blue',  c:'#2E6FB8', n:'블루',  r:'공정·지시서 검증'},
+  {id:'green', c:'#2C7A4B', n:'그린',  r:'원료 원가 전문가'},
+  {id:'yellow',c:'#A8820C', n:'옐로',  r:'시장성 검증'},
+  {id:'black', c:'#4A5560', n:'블랙',  r:'설계 수행 / 모델 정합'}
+];
+function review(){
+  const out={}; PERSONAS.forEach(p=>out[p.id]={score:10,notes:[],fixes:[]});
+  const push=(id,txt,pen,fix)=>{const o=out[id];o.notes.push({txt,hit:pen>0});
+    o.score-=pen; if(fix)o.fixes.push(fix);};
+
+  ORDER.forEach(k=>{
+    const R=S.res[k], G=GRADES[k], c=S.g[k].comp, L=G.label;
+    /* RED — 야금 타당성 */
+    const cons=constraints(k,R);
+    if(!cons.length) push('red',`${L} 야금 제약 전 항목 충족 (δ·Md30/γmax·FN·예민화·립경)`,0);
+    cons.forEach(x=>push('red',`${L} ${x.txt}`,x.lv==='no'?2.0:1.0,{k,...x.fix}));
+
+    /* BLUE — 조업 가능성 */
+    const ops=operability(k);
+    if(!ops.length) push('blue',`${L} 공정 열이력·압하 스케줄 정합, 설비 능력 내`,0);
+    ops.forEach(x=>push('blue',`${L} ${x.txt}`,1.6,{k,...x.fix}));
+
+    /* GREEN — 원가 */
+    const dv=(R.cost.total-G.refCost)/G.refCost;
+    if(dv>0.02){
+      push('green',`${L} 원가 ${R.cost.total.toFixed(0)} USD/t — 기준 ${G.refCost} 대비 +${(dv*100).toFixed(1)} %`,
+           Math.min(3,dv*45),null);
+    }else{
+      push('green',`${L} 원가 ${R.cost.total.toFixed(0)} USD/t — 기준 대비 ${(dv*100).toFixed(1)} %`,0);
+    }
+    if(R.fam==='austenitic'){
+      const nc=niCut(k);
+      if(nc) push('green',`${L} Ni ${nc.dNi.toFixed(2)} % 절감 여지 — Md30 등가 유지하며 ${nc.save.toFixed(0)} USD/t 절감 가능`,
+                  Math.min(1.5,nc.save/60),{k,t:'niCut'});
+      const ni=R.cost.brk.Ni/R.cost.alloy*100;
+      push('green',`${L} 합금비 중 Ni 비중 ${ni.toFixed(0)} %, Cr ${(R.cost.brk.Cr/R.cost.alloy*100).toFixed(0)} %`,0);
+    }
+    if(c.S<0.0008) push('green',`${L} S ${(c.S*1e4).toFixed(0)} ppm — 심탈황 비용 ${R.cost.sPen.toFixed(0)} USD/t 발생`,
+                        Math.min(1,R.cost.sPen/70),{k,t:'comp',e:'S',v:0.0015});
+    if(R.cost.conv>560) push('green',`${L} 가공비 ${R.cost.conv.toFixed(0)} USD/t 과다 — 소둔 온도·속도 재검토`,
+                             Math.min(1.2,(R.cost.conv-560)/90),{k,t:'proc',e:'crAnnV',v:Math.min(150,S.g[k].proc.crAnnV+25)});
+
+    /* YELLOW — 시장성 */
+    let offSpec=0;
+    Object.entries(G.spec).forEach(([e,[lo,hi]])=>{
+      if(c[e]<lo-1e-9||(hi!==null&&c[e]>hi+1e-9)) offSpec++;
+    });
+    if(offSpec){
+      push('yellow',`${L} 성분 ${offSpec}개 항목이 A240 범위 밖 — 표준강종으로 판매 불가, 고객 승인 필요`,
+           Math.min(3,offSpec*1.5),null);
+    }else{
+      push('yellow',`${L} A240 성분·기계적 규격 모두 충족 — 표준강종으로 즉시 판매 가능`,0);
+    }
+    const mfail=Object.entries(G.mech).filter(([m,[lo,hi]])=>
+      (lo!==null&&R[m]<lo)||(hi!==null&&R[m]>hi)).map(([m])=>m);
+    if(mfail.length) push('yellow',`${L} ${mfail.join(', ')} 규격 미달 — 성적서 발행 불가`,mfail.length*1.5,null);
+    const pc=(R.cost.total-G.refCost)/G.refCost*100;
+    if(pc>6) push('yellow',`${L} 시장 벤치마크 대비 원가 +${pc.toFixed(0)} % — 가격경쟁력 열위`,Math.min(2,(pc-6)/9),null);
+    else push('yellow',`${L} ${G.demand}`,0);
+
+    /* BLACK — 모델 정합 */
+    const bad=[...Object.values(R).filter(v=>typeof v==='number'&&!isFinite(v))];
+    if(bad.length) push('black',`${L} 모델 발산 — 입력 범위 확인 필요`,3,null);
+    else push('black',`${L} 계산 수렴, ${R.eq.length}개 회귀식 적용 · 근거 기록 완료`,0);
+    if(R.fam==='austenitic'&&Math.abs(R.md30-R.md30A)>230)
+      push('black',`${L} Nohara·Angel Md30 편차 ${Math.abs(R.md30-R.md30A).toFixed(0)} ℃ — 두 식의 적용역 상이, 참고만`,0.3,null);
+  });
+
+  PERSONAS.forEach(p=>{out[p.id].score=Math.max(0,Math.min(10,out[p.id].score));});
+  out.min=Math.min(...PERSONAS.map(p=>out[p.id].score));
+  out.pass=out.min>=9;
+  return out;
+}
+
+/* ── 자동 개선 : 9점 미만 지적사항을 순차 반영 ─────────────── */
+/* 게이트는 9.0 이지만 자동 개선은 9.5 를 목표로 여유를 확보한다 */
+function autoFix(){
+  const applied=[]; let prev=-1;
+  for(let it=0; it<14; it++){
+    const rv=review();
+    if(rv.min>=9.5) break;
+    if(rv.min<=prev && it>0) break;          // 개선이 멈추면 중단
+    prev=rv.min;
+    const fixes=[];
+    PERSONAS.forEach(p=>{ if(rv[p.id].score<9.5) fixes.push(...rv[p.id].fixes); });
+    if(!fixes.length) break;
+    const f=fixes[0]; if(!f||!f.k) break;
+    const k=f.k;
+    if(f.t==='niCut'){
+      const nc=niCut(k);
+      if(!nc) break;
+      Object.keys(nc.c).forEach(e=>{ if(nc.c[e]!==S.g[k].comp[e]) S.g[k].solved[e]=1; });
+      S.g[k].comp={...nc.c};
+      applied.push(`${GRADES[k].label} Ni −${nc.dNi.toFixed(2)} % (N+${nc.dN.toFixed(3)}, Cu+${nc.dCu.toFixed(2)}, Mn+${nc.dMn.toFixed(2)}) → −${nc.save.toFixed(0)} USD/t`);
+    }else if(f.t==='comp'){
+      const kn=GRADES[k].knobs[f.e]||[EL.find(x=>x.k===f.e).min,EL.find(x=>x.k===f.e).max];
+      const spec=GRADES[k].spec[f.e];
+      let lo=kn[0],hi=kn[1];
+      if(spec){ lo=Math.max(lo,spec[0]); if(spec[1]!==null) hi=Math.min(hi,spec[1]); }
+      const dec=EL.find(x=>x.k===f.e).d;
+      const nv=+cl(f.v,lo,hi).toFixed(dec);
+      if(Math.abs(nv-S.g[k].comp[f.e])<1e-9) break;
+      applied.push(`${GRADES[k].label} ${f.e} ${S.g[k].comp[f.e]} → ${nv} wt%`);
+      S.g[k].comp[f.e]=nv; S.g[k].solved[f.e]=1;
+    }else if(f.t==='proc'){
+      const m=PR.find(x=>x.k===f.e);
+      const nv=+cl(f.v,m.min,m.max).toFixed(m.d);
+      if(Math.abs(nv-S.g[k].proc[f.e])<1e-9) break;
+      applied.push(`${GRADES[k].label} ${m.n} ${S.g[k].proc[f.e]} → ${nv} ${m.u}`);
+      S.g[k].proc[f.e]=nv; S.g[k].solved[f.e]=1;
+    }else if(f.t==='prop'){
+      const r=solve(k,f.e,f.v,'proc');
+      if(!r.steps.length){ const r2=solve(k,f.e,f.v,'comp');
+        if(!r2.steps.length) break;
+        applied.push(`${GRADES[k].label} ${f.e} 목표 ${f.v.toFixed(0)} → 성분 ${r2.steps.map(s=>s.knob).join('·')} 조정`);
+      }else applied.push(`${GRADES[k].label} ${f.e} 목표 ${f.v.toFixed(0)} → 공정 ${r.steps.map(s=>s.knob).join('·')} 조정`);
+    }else break;
+    recalc();
+  }
+  return applied;
+}
+/* ══════════════════════════════════════════════════════════════
+   8. 렌더링
+   ══════════════════════════════════════════════════════════════ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const f=(v,d)=>(v===null||v===undefined||!isFinite(v))?'—':Number(v).toFixed(d);
+const sgn=(v,d)=>(v>=0?'+':'')+f(v,d);
+
+/* ── 8-1 계열 탭 + 검증 탭 ──────────────────────────────────── */
+const REVIEW_TAB='__review';
+function renderTabs(rv){
+  rv=rv||review();
+  const fam=ORDER.map(k=>{
+    const G=GRADES[k], R=S.res[k];
+    const cons=constraints(k,R), ops=operability(k);
+    const bad=cons.filter(x=>x.lv==='no').length+ops.length;
+    const wa=cons.filter(x=>x.lv==='wa').length;
+    const dot=bad?'no':(wa?'wa':'ok');
+    return `<button class="tab${k===S.tab?' on':''}" data-tab="${k}"
+      role="tab" aria-selected="${k===S.tab}">
+      <i class="tdot-${dot}"></i>
+      <b>${G.famKo}</b>
+      <span>기준 ${G.label} · ${f(R.YS,0)} / ${f(R.TS,0)} MPa · ${f(R.cost.total,0)} USD/t</span>
+    </button>`;
+  }).join('');
+  const low=PERSONAS.filter(p=>rv[p.id].score<9).length;
+  const on=S.tab===REVIEW_TAB;
+  return $('#tabs').innerHTML = fam + `<button class="tab rev${on?' on':''}"
+    data-tab="${REVIEW_TAB}" role="tab" aria-selected="${on}">
+    <i class="tdot-${rv.pass?'ok':'no'}"></i>
+    <b>페르소나 검증</b>
+    <span>${rv.pass?`5인 전원 통과 · 최저 ${rv.min.toFixed(1)} / 10`
+                   :`미통과 ${low}인 · 최저 ${rv.min.toFixed(1)} / 10`}</span>
+  </button>`;
+}
+/* 선택된 탭에 맞춰 표시 대상 전환 */
+function applyTab(){
+  const rev=S.tab===REVIEW_TAB;
+  ORDER.forEach(k=>{
+    const bay=document.querySelector(`[data-bay="${k}"]`);
+    if(bay) bay.hidden = rev || k!==S.tab;
+  });
+  const b=$('#board'); if(b) b.hidden=!rev;
+}
+
+
+/* ── 8-2 페르소나 보드 ──────────────────────────────────────── */
+function renderBoard(rv){
+  $('#personas').innerHTML=PERSONAS.map(p=>{
+    const o=rv[p.id], col=o.score>=9?'var(--pass)':o.score>=7?'var(--warn)':'var(--fail)';
+    return `<div class="persona">
+      <div class="p-top">
+        <span class="dot" style="background:${p.c};color:${p.c}"></span>
+        <span class="p-name">${p.n}<em>${p.r}</em></span>
+        <span class="score" style="color:${col}">${o.score.toFixed(1)}<small>/10</small></span>
+      </div>
+      <div class="bar"><i style="width:${o.score*10}%;background:${col}"></i></div>
+      <ul class="p-notes">${o.notes.slice(0,7).map(n=>
+        `<li class="${n.hit?'hit':''}">${esc(n.txt)}</li>`).join('')}</ul>
+    </div>`;
+  }).join('');
+  const g=$('#gate');
+  g.className='gate '+(rv.pass?'ok':'no');
+  g.textContent=rv.pass?`설계 승인 — 최저 ${rv.min.toFixed(1)} / 10`
+                       :`검증 미통과 — 최저 ${rv.min.toFixed(1)} / 10 (기준 9.0)`;
+}
+
+/* ── 8-3 공정 열이력 ────────────────────────────────────────── */
+/* 곡선만 SVG, 모든 글자는 HTML 이라 본문과 같은 크기로 읽힌다 */
+function thermo(k){
+  const p=S.g[k].proc, R=S.res[k];
+  const pts=[['슬라브',p.rhfT],['RDT',p.rdt],['FDT',p.fdt],['CT',p.ct],
+             ['열연소둔',p.hrAnnT],['냉간압연',60],['냉연소둔',p.crAnnT]];
+  const H=130, hi=1320;
+  const pct=v=>(1-v/hi)*100;
+  const X=i=>i*100/(pts.length-1);
+  const line=pts.map((q,i)=>`${X(i).toFixed(2)},${(pct(q[1])*H/100).toFixed(2)}`).join(' ');
+  const ac1=(R.fam!=='austenitic'&&R.gmax>5)?R.ac1:null;
+  const grid=[400,800,1200];
+  return `<div class="thermo">
+    <div class="cap">공정 열이력 · ${p.slab} mm 슬라브 → ${p.hrT} mm 열연 → ${p.crT} mm 냉연</div>
+    <div class="tplot" style="height:${H}px">
+      <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true">
+        ${grid.map(t=>`<line x1="0" y1="${pct(t)*H/100}" x2="100" y2="${pct(t)*H/100}"
+          stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"
+          stroke-dasharray="3 4"/>`).join('')}
+        ${ac1?`<line x1="0" y1="${pct(ac1)*H/100}" x2="100" y2="${pct(ac1)*H/100}"
+          stroke="var(--fail)" stroke-width="1.4" vector-effect="non-scaling-stroke"
+          stroke-dasharray="6 3"/>`:''}
+        <polyline points="${line}" fill="none" stroke="var(--amber)" stroke-width="2.4"
+          vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      ${grid.map(t=>`<span class="tgrid" style="top:${pct(t)}%">${t} ℃</span>`).join('')}
+      ${ac1?`<span class="tac1" style="top:${pct(ac1)}%">Ac1 ${ac1.toFixed(0)} ℃</span>`:''}
+      ${pts.map((q,i)=>`<span class="tdot ${i>=5?'cold':'hot'}"
+        style="left:${X(i)}%;top:${pct(q[1])}%"></span>`).join('')}
+    </div>
+    <div class="tstage">${pts.map((q,i)=>
+      `<div class="${i>=5?'cold':'hot'}"><b>${q[0]}</b><span>${i===5?'냉간':q[1]+' ℃'}</span></div>`).join('')}</div>
+  </div>`;
+}
+
+/* ── 8-4b 변경 요약 — 무엇을 바꿨고 왜 그렇게 움직였는지 ───── */
+function summaryHTML(k){
+  const c=S.chg[k];
+  if(!c) return `<div class="sumbox empty-sum">
+    <b>변경 요약</b> — 아직 수정한 항목이 없습니다. 위 제조조건을 고치거나 물성 값을 직접 입력하면
+    그 변화가 어떤 야금 경로를 거쳐 어느 물성으로 이어졌는지 여기에 정리됩니다.</div>`;
+  const A=c.A, B=c.B;
+  const rows=PROP.map(pr=>{
+    const a=A[pr.k], b=B[pr.k], dv=b-a;
+    if(Math.abs(dv)<Math.pow(10,-pr.d)/2) return null;
+    const lim=GRADES[k].mech[pr.k];
+    let flag='';
+    if(lim){ const[lo,hi]=lim;
+      if(lo!==null&&b<lo) flag=`<span class="sf no">규격 미달 (min ${lo})</span>`;
+      else if(hi!==null&&b>hi) flag=`<span class="sf no">규격 초과 (max ${hi})</span>`;
+      else if((lo!==null&&a<lo)||(hi!==null&&a>hi)) flag=`<span class="sf ok">규격 진입</span>`;
+    }
+    return `<tr><td>${pr.n}</td><td><span class="num">${f(a,pr.d)}</span></td>
+      <td><span class="num">${f(b,pr.d)}</span></td>
+      <td><span class="num ${dv>0?'up':'dn'}">${sgn(dv,pr.d)}</span>
+      <span class="mini">${pr.u}</span></td><td>${flag}</td></tr>`;
+  }).filter(Boolean);
+  const dC=B.cost.total-A.cost.total;
+  if(Math.abs(dC)>=0.5) rows.push(`<tr><td>총원가</td><td><span class="num">${f(A.cost.total,0)}</span></td>
+    <td><span class="num">${f(B.cost.total,0)}</span></td>
+    <td><span class="num ${dC<0?'up':'dn'}">${sgn(dC,0)}</span><span class="mini">USD/t</span></td>
+    <td>${Math.abs(dC)>40?`<span class="sf ${dC<0?'ok':'no'}">원가 영향 큼</span>`:''}</td></tr>`);
+
+  // 중간 야금 변수 — 실제로 움직인 것만
+  const mid=[];
+  const m=(n,a,b,d,u,why)=>{ if(Math.abs(b-a)>=Math.pow(10,-d)/2)
+    mid.push(`<li><b>${n}</b> ${f(a,d)} → ${f(b,d)} ${u||''}${why?` — ${why}`:''}</li>`); };
+  m('결정립 d',A.d,B.d,1,'µm',`ASTM ${f(A.G,1)} → ${f(B.G,1)}, Hall–Petch 기여 `
+    +`${f((A.fam==='austenitic'?15.4*0.46:18.97)*Math.pow(A.d/1000,-0.5),0)} → `
+    +`${f((B.fam==='austenitic'?15.4*0.46:18.97)*Math.pow(B.d/1000,-0.5),0)} MPa`);
+  if(B.fam==='austenitic'){
+    m('Md30',A.md30,B.md30,1,'℃',`30 % 변형 α′ ${f(A.V30,1)} → ${f(B.V30,1)} %, TRIP 기여 ${f(A.trip,0)} → ${f(B.trip,0)} MPa`);
+    m('Nieq',A.nieq,B.nieq,2,'','γ 안정도');
+    m('잔류 δ',A.dFin,B.dFin,2,'%');
+    m('δ @1300 ℃',A.dCast,B.dCast,1,'%','열간압연 연성');
+    m('용접 FN',A.FN,B.FN,1,'');
+  }else{
+    m('γmax',A.gmax,B.gmax,1,'%','가열 시 생성 가능한 오스테나이트량');
+    m('Ac1',A.ac1,B.ac1,0,'℃',`냉연소둔 ${S.g[k].proc.crAnnT} ℃ 대비 ${S.g[k].proc.crAnnT>B.ac1?'초과':'미만'}`);
+    m('마르텐사이트',A.fm*100,B.fm*100,0,'%','냉각 중 변태량');
+    m('KFF',A.kff,B.kff,2,'');
+    m('r̄ 값',A.rbar,B.rbar,2,'','심가공성');
+    m('리징지수',A.ridge,B.ridge,1,'/10');
+  }
+  m('PREN',A.pren,B.pren,1,'',`Epit 기본항 ${f(-75+21*A.pren,0)} → ${f(-75+21*B.pren,0)} mV`);
+  m('유효 C (Ceff)',A.Ceff,B.Ceff,4,'%','Ti·Nb 안정화 후 잔여 고용탄소');
+  m('예민화 DOS',A.DOS,B.DOS,0,'/100',`Epit ${f(A.dSens,0)} → ${f(B.dSens,0)} mV`);
+
+  // 판정 변화
+  const cb=constraints(k,B), ca=constraints(k,A).map(x=>x.id);
+  const born=cb.filter(x=>!ca.includes(x.id)), gone=ca.filter(id=>!cb.some(x=>x.id===id));
+  const verdict=[];
+  born.forEach(x=>verdict.push(`<span class="sf ${x.lv==='no'?'no':'wa'}">신규 ${x.txt}</span>`));
+  if(gone.length) verdict.push(`<span class="sf ok">해소 ${gone.length}건</span>`);
+
+  return `<div class="sumbox">
+    <div class="sum-h"><b>변경 요약</b>
+      <span class="sum-what">${esc(c.what)} <span class="num">${f(c.from,c.d)}</span> →
+      <span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}</span>
+      <span class="sum-mode">${c.mode}</span></div>
+    <div class="sum-grid">
+      <div><div class="sum-t">야금 경로</div>
+        ${mid.length?`<ul class="sum-mid">${mid.join('')}</ul>`
+          :'<p class="empty">중간 변수 변화 없음 — 물성에 직접 작용했습니다.</p>'}</div>
+      <div><div class="sum-t">물성·원가 변화</div>
+        ${rows.length?`<table class="sum-tb"><thead><tr><th>항목</th><th>이전</th><th>변경</th>
+          <th>차이</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table>`
+          :'<p class="empty">유효 자릿수 내 변화 없음</p>'}</div>
+    </div>
+    ${verdict.length?`<div class="sum-v">${verdict.join('')}</div>`:''}
+    <p class="sum-note">${esc(c.note||'')}</p></div>`;
+}
+/* ── 8-4 강종 베이 ──────────────────────────────────────────── */
+function fieldHTML(k,kind,m){
+  const st=S.g[k], v=(kind==='comp'?st.comp:st.proc)[m.k];
+  const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':''].join(' ');
+  const spec=kind==='comp'?GRADES[k].spec[m.k]:null;
+  const oos=spec&&(v<spec[0]-1e-9||(spec[1]!==null&&v>spec[1]+1e-9))?' oos':'';
+  const hint=spec?`${spec[0]}–${spec[1]===null?'—':spec[1]}`:(m.u||'');
+  return `<div class="f"><label>${m.n||m.k}<i>${hint}</i></label>
+    <input type="number" class="${cls}${oos}" value="${v}" step="${m.s}"
+      data-g="${k}" data-kind="${kind}" data-key="${m.k}"
+      min="${m.min}" max="${m.max}" aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
+}
+function propHTML(k,g){
+  const R=S.res[k], sp=GRADES[k].mech;
+  return PROP.filter(p=>p.grp===g).map(p=>{
+    const v=R[p.k], lim=sp[p.k];
+    let s='',c='ok';
+    if(lim){ const[lo,hi]=lim;
+      if(lo!==null&&v<lo){s=`A240 min ${lo}`;c='lo';}
+      else if(hi!==null&&v>hi){s=`A240 max ${hi}`;c='hi';}
+      else s=lo!==null?`min ${lo} 충족`:`max ${hi} 충족`;
+    }else{
+      if(p.k==='Ep') s=v>250?'우수':v>120?'보통':'취약';
+      if(p.k==='ic') s=v<2?'부동태화 용이':v<8?'보통':'난부동태';
+      c=(p.k==='Ep'?(v>250?'ok':v>120?'hi':'lo'):(v<2?'ok':v<8?'hi':'lo'));
+    }
+    return `<div class="prop" data-pk="${p.k}" data-g="${k}">
+      <div class="prop-l"><b>${p.n}</b><span>${p.u}</span></div>
+      <input type="number" value="${f(v,p.d)}" step="${p.d?0.1:1}"
+        data-g="${k}" data-prop="${p.k}" aria-label="${GRADES[k].label} ${p.n} 목표값">
+      <div class="sub"><span class="vs ${c}">${s}</span></div></div>`;
+  }).join('')+`<div class="chooser" id="ch-${k}-${g}" hidden></div>`;
+}
+function idxHTML(k){
+  const R=S.res[k], it=[];
+  const add=(a,b,c)=>it.push([a,b,c||'']);
+  add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`);
+  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa');
+  if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa');
+  if(R.fam==='austenitic'){
+    add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa');
+    add('Md30 (Nohara)',f(R.md30,0)+' ℃',Math.abs(R.md30)<=40?'ok':'wa');
+    add('α′ @30 % 변형',f(R.V30,1)+' %');
+    add('Ms',f(R.msA,0)+' ℃');
+    add('비투자율 µr',f(R.mu,3));
+  }else{
+    add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'));
+    add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa');
+    add('Ac1 / Ac3',`${f(R.ac1,0)} / ${f(R.ac3,0)} ℃`);
+    add('Ms',f(R.msMar,0)+' ℃');
+    add('마르텐사이트',f(R.fm*100,0)+' %',R.fam==='martensitic'?'':(R.fm>0.02?'wa':'ok'));
+    if(R.fam==='ferritic'){
+      add('r̄ 값',f(R.rbar,2),R.rbar>=0.95?'ok':'wa');
+      add('리징지수',f(R.ridge,1)+' /10',R.ridge<=6?'ok':'wa');
+    }
+  }
+  add('결정립 d',`${f(R.d,1)} µm`,R.d>=8&&R.d<=45?'ok':'wa');
+  add('ASTM 립도',f(R.G,1));
+  add('예민화 DOS',f(R.DOS,0)+' /100',R.DOS<=30?'ok':'wa');
+  add('유효 C (Ceff)',f(R.Ceff,4)+' %');
+  add('냉간압하율',f(R.crRed,1)+' %',R.crRed>=40&&R.crRed<=92?'ok':'wa');
+  add('소둔 유효시간',f(R.tCR,0)+' s');
+  return `<div class="idx">${it.map(([a,b,c])=>
+    `<div class="ix"><span class="k">${a}</span><span class="v ${c}">${b}</span></div>`).join('')}</div>`;
+}
+function costHTML(k){
+  const R=S.res[k], C=R.cost, T=C.total;
+  const seg=[['Ni',C.brk.Ni],['Cr',C.brk.Cr],['Fe',C.brk.Fe],['Mo',C.brk.Mo],
+             ['Cu',C.brk.Cu],
+             ['기타',C.brk.Mn+C.brk.Si+C.brk.Ti+C.brk.Nb+C.brk.N+C.brk.Al+C.brk.C],
+             ['정련',C.refine],['가공',C.conv]].filter(s=>s[1]>0.5);
+  const ref=GRADES[k].refCost, dv=(T-ref)/ref*100;
+  return `<div class="cost-top"><b class="num">${f(T,0)}</b><span>USD / 톤 (냉연 코일)</span>
+    <span style="margin-left:auto;color:${dv>2?'var(--fail)':'var(--pass)'}">
+    벤치마크 ${ref} 대비 ${sgn(dv,1)} %</span></div>
+    <div class="cbar">${seg.map(([n,v])=>
+      `<div style="width:${v/T*100}%;background:${COST_COLOR[n]}" title="${n} ${f(v,0)}">
+       ${v/T>0.09?`<span>${n}</span>`:''}</div>`).join('')}</div>
+    <div class="clegend">${seg.map(([n,v])=>
+      `<div><span><i style="background:${COST_COLOR[n]}"></i>${n}</span>
+       <b>${f(v,0)}<span class="mini">${(v/T*100).toFixed(0)}%</span></b></div>`).join('')}
+      <div><span>성분원가 소계</span><b>${f(C.alloy+C.refine,0)}</b></div>
+      <div><span>단위 YS당</span><b>${f(T/R.YS,2)}<span class="mini">$/t·MPa</span></b></div>
+    </div>`;
+}
+function bayHTML(k){
+  const G=GRADES[k], R=S.res[k], cons=constraints(k,R), ops=operability(k);
+  const chips=[];
+  const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
+  chips.push(specOK?['ok','A240 적합']:['no','A240 부적합']);
+  chips.push(cons.filter(x=>x.lv==='wa').length
+    ?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상']);
+  chips.push(ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능']);
+  chips.push(['ok',`${f(R.cost.total,0)} USD/t`]);
+  return `<section class="bay" data-bay="${k}"${k===S.tab?"":" hidden"}>
+    <header class="bay-head">
+      <div class="bay-id"><b>${G.famKo}</b><span>기준 ${G.label} · ${G.note}</span></div>
+      <div class="chips">${chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('')}</div>
+    </header>
+    <div class="bay-body">
+      <div class="col in">
+        <div class="grp"><div class="grp-h"><h3>공정 개요</h3></div>${thermo(k)}</div>
+        <div class="grp rail comp"><div class="grp-h"><h3>성분</h3><span class="u">wt %</span>
+          <span class="hint">라벨 아래 숫자는 A240 규격범위</span></div>
+          <div class="fields c13">${EL.map(m=>fieldHTML(k,'comp',m)).join('')}</div></div>
+        <div class="grp rail hot"><div class="grp-h"><h3>열간 공정</h3>
+          <span class="hint">슬라브 → 가열 → 조압연 → 사상 → 권취 → 소둔</span></div>
+          <div class="fields p13">${PR.filter(m=>m.st==='hot').map(m=>fieldHTML(k,'proc',m)).join('')}</div></div>
+        <div class="grp rail cold"><div class="grp-h"><h3>냉간 공정</h3>
+          <span class="hint">냉간압연 → 연속소둔</span></div>
+          <div class="fields p13">${PR.filter(m=>m.st==='cold').map(m=>fieldHTML(k,'proc',m)).join('')}</div></div>
+      </div>
+      <div class="col out">
+        <div class="grp"><div class="grp-h"><h3>기계적 성질</h3>
+          <span class="hint">값을 고쳐 넣으면 역설계</span></div>
+          <div class="props">${propHTML(k,'mech')}</div></div>
+        <div class="grp"><div class="grp-h"><h3>내식성</h3>
+          <span class="u">3.5 % NaCl 30 ℃ / 0.5 M H₂SO₄</span></div>
+          <div class="props">${propHTML(k,'corr')}</div></div>
+        <div class="grp"><div class="grp-h"><h3>야금 지표</h3></div>${idxHTML(k)}</div>
+        <div class="grp"><div class="grp-h"><h3>원가</h3></div>${costHTML(k)}</div>
+      </div>
+    </div>
+    <div class="sumwrap">${summaryHTML(k)}</div>
+    <details class="basis"><summary>설계 근거 · 적용 회귀식 ${R.eq.length}건</summary>
+      <div class="basis-body">${R.eq.map(e=>`<div class="eq"><h4>${esc(e.h)}</h4>
+        <code>${esc(e.f)}</code><p>${esc(e.t).replace(/\n/g,'<br>')}</p>
+        <p class="src">${esc(e.s)}</p></div>`).join('')}</div>
+      <div class="trail"><div class="trail-h">변경 이력</div>
+        ${S.log[k].length?S.log[k].slice(-14).reverse().map(e=>
+          `<div class="entry">${e}</div>`).join(''):'<div class="empty">변경 없음 — 기준 설계값</div>'}
+      </div>
+    </details></section>`;
+}
+
+/* ── 8-6 전체 ───────────────────────────────────────────────── */
+function render(){
+  recalc();
+  const rv=review();
+  renderTabs(rv); renderBoard(rv);
+  $('#bays').innerHTML=ORDER.map(bayHTML).join('');
+  applyTab();
+  bindBays();
+}
+/* ══════════════════════════════════════════════════════════════
+   9. 이벤트 — 위임 방식
+   ══════════════════════════════════════════════════════════════ */
+let bound=false, pending=null;
+function bindBays(){ if(bound) return; bound=true;
+  const root=$('#bays');
+
+  // 9-1 제조조건 입력 → 순방향 재계산
+  root.addEventListener('input',e=>{
+    const t=e.target; if(!t.dataset.kind) return;
+    const {g:k,kind,key}=t.dataset;
+    const v=parseFloat(t.value); if(!isFinite(v)) return;
+    const meta=kind==='comp'?EL.find(x=>x.k===key):PR.find(x=>x.k===key);
+    const nv=cl(v,meta.min,meta.max);
+    const before=S.res[k]; const prevVal=(kind==="comp"?S.g[k].comp:S.g[k].proc)[key];
+    (kind==='comp'?S.g[k].comp:S.g[k].proc)[key]=nv;
+    S.g[k].touched[key]=1; delete S.g[k].solved[key];
+    recalc();
+    const after=S.res[k];
+    logForward(k,kind,key,meta,before,after);
+    snap(k,kind==="comp"?key:meta.n,prevVal,nv,meta.d,kind==="comp"?"wt%":meta.u,
+         "제조조건 수정 → 물성 재계산",before,after,noteFor(k,kind,key,before,after));
+    t.classList.add('touched');
+    refreshOut();
+  });
+
+  // 9-2 물성 입력 → 역설계 선택지 노출
+  root.addEventListener('change',e=>{
+    const t=e.target; if(!t.dataset.prop) return;
+    const k=t.dataset.g, pk=t.dataset.prop;
+    const tgt=parseFloat(t.value); if(!isFinite(tgt)) return;
+    const cur=S.res[k][pk], meta=PROP.find(x=>x.k===pk);
+    if(Math.abs(tgt-cur)<Math.abs(cur)*0.002){ t.value=f(cur,meta.d); return; }
+    pending={k,pk,tgt,cur};
+    const box=$(`#ch-${k}-${meta.grp}`);
+    box.hidden=false;
+    box.innerHTML=`<p><b>${meta.n}</b> ${f(cur,meta.d)} → <b>${f(tgt,meta.d)}</b> ${meta.u}
+      &nbsp;무엇을 바꿔 맞출까요?</p>
+      <button class="btn sm" data-solve="comp">성분 변경</button>
+      <button class="btn sm" data-solve="proc">제조조건 변경</button>
+      <button class="btn sm" data-solve="cancel">취소</button>`;
+    document.querySelectorAll('.prop').forEach(p=>p.classList.remove('tgt'));
+    t.closest('.prop').classList.add('tgt');
+  });
+
+  // 9-3 선택 처리
+  root.addEventListener('click',e=>{
+    const b=e.target.closest('[data-solve]'); if(!b||!pending) return;
+    const mode=b.dataset.solve, {k,pk,tgt}=pending;
+    if(mode==='cancel'){ pending=null; render(); return; }
+    const bIn=S.res[k];
+    const r=solve(k,pk,tgt,mode);
+    logInverse(k,r);
+    snap(k,PROP.find(x=>x.k===pk).n,r.base,r.achieved,PROP.find(x=>x.k===pk).d,
+         PROP.find(x=>x.k===pk).u, mode==="comp"?"역설계 · 성분 조정":"역설계 · 제조조건 조정",
+         bIn,S.res[k],
+         r.steps.length
+           ? (mode==="comp"?"성분 ":"제조조건 ")+r.steps.map(s=>s.mode==="comp"?s.knob:PR.find(x=>x.k===s.knob).n).join(", ")
+             +" 을(를) 단위 원가당 물성 변화량이 큰 순으로 조정했습니다."
+             +(Math.abs(r.achieved-r.target)<Math.abs(r.target)*0.01?"":" 규격·조업창 한계로 목표에는 도달하지 못했습니다.")
+           : "규격·조업창 내에 해가 없어 변경하지 않았습니다.");
+    pending=null; render();
+    const bay=document.querySelector(`[data-bay="${k}"]`);
+    if(bay) bay.querySelector('details.basis').open=true;
+  });
+}
+
+
+/* ── 변경 스냅샷 : 요약 패널의 원본 데이터 ─────────────────── */
+function snap(k,what,from,to,dec,unit,mode,A,B,note){
+  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note};
+}
+function noteFor(k,kind,key,A,B){
+  const R=B;
+  if(kind==='comp'){
+    if(key==='Cr') return 'Cr 는 PREN·Creq·Ac1 을 동시에 올리는 축입니다. 내식성이 개선되는 대신 페라이트 안정화가 진행되고 합금비가 kg 당 ' + S.prices.Cr + ' USD 증가합니다.';
+    if(key==='Ni') return 'Ni 는 Nieq 를 통해 오스테나이트를 안정화합니다. 원가 기여도가 가장 큰 원소이므로 N·Cu·Mn 치환 여지를 함께 검토하십시오.';
+    if(key==='C'||key==='N') return '침입형 원소는 고용강화(Pickering 식 계수 C 23, N 32)로 강도를 직접 올리는 대신, 오스테나이트계에서는 Md30 을 낮춰 TRIP 연신을 깎고 페라이트계에서는 예민화 위험을 키웁니다.';
+    if(key==='Ti'||key==='Nb') return 'Ti·Nb 는 탄질화물로 C 를 고정해 예민화를 막습니다. Ti 는 N 을 먼저(TiN, Ti/N=3.42) 소모하므로 C 고정분까지 확보하려면 그만큼 더 넣어야 하고, 과잉 Ti 는 TiN 개재물로 공식전위를 깎습니다.';
+    if(key==='Mo') return 'Mo 는 PREN 계수 3.3 으로 내공식성 기여가 크고 임계전류밀도도 낮추지만, kg 당 ' + S.prices.Mo + ' USD 로 가장 비싼 원소입니다.';
+    if(key==='S') return 'S 는 MnS 개재물로 공식 기점이 됩니다. 낮출수록 내식성이 좋아지지만 심탈황 비용이 로그 스케일로 증가합니다.';
+    if(key==='Cu') return 'Cu 는 Nieq 에 1.0 계수로 들어가 Ni 를 대체할 수 있고 임계전류밀도를 크게 낮추지만, 과다 시 열간취성 위험이 있습니다.';
+    return '성분 변화가 당량·PREN·조직 경로를 거쳐 물성에 반영되었습니다.';
+  }
+  if(key==='crAnnT'||key==='hrAnnT'){
+    if(R.fam!=='austenitic' && R.gmax>5)
+      return '소둔온도는 Ac1 ' + f(R.ac1,0) + ' ℃ 를 기준으로 거동이 갈립니다. 아래면 탄화물이 구상화된 연질 페라이트, 위면 오스테나이트가 생겨 냉각 중 마르텐사이트로 변태해 경도가 급등합니다.';
+    return '소둔온도는 Beck 성장식 exp(−Q/RT) 항을 통해 결정립에 지수적으로 작용합니다. 온도가 오르면 입경이 커져 Hall–Petch 강화가 줄고 연신이 늘어납니다.';
+  }
+  if(key==='crAnnV'||key==='hrAnnV') return '라인속도는 소둔 유효시간(45 m ÷ 속도)을 통해 결정립 성장시간과 예민화역 체류시간을 동시에 바꿉니다. 빠를수록 입경이 작아 강도가 오르고 톤당 고정비가 줄지만, 재결정 미완 위험이 생깁니다.';
+  if(key==='fdt'||key==='ct') return '열연 조건은 열연판 결정립을 통해 냉연 재결정 초기립에 이어집니다. 페라이트계에서는 이 경로가 리징과 r값을 좌우합니다.';
+  if(key==='hrT'||key==='crT') return '두께 변경은 냉간압하율 ' + f(R.crRed,1) + ' % 를 바꿉니다. 압하율이 클수록 저장에너지가 커져 재결정립이 미세해지고 {111} 집합조직이 발달합니다.';
+  if(key==='rhfT'||key==='rdt'||key==='slab') return '재가열·조압연 조건은 석출물 고용도와 총 압하량을 통해 하공정 조직에 간접 작용합니다.';
+  return '공정 변화가 조직 경로를 거쳐 물성에 반영되었습니다.';
+}
+/* ── 변경 이력 기록 ─────────────────────────────────────────── */
+function delta(a,b,key,d,u){
+  const dv=b-a; if(Math.abs(dv)<Math.pow(10,-d)/2) return '';
+  const cls=dv>0?'up':'dn';
+  return ` <span class="${cls}">${key} ${sgn(dv,d)}${u}</span>`;
+}
+function logForward(k,kind,key,meta,A,B){
+  const nm=kind==='comp'?key:meta.n, u=kind==='comp'?' wt%':' '+meta.u;
+  let d='';
+  d+=delta(A.YS,B.YS,'YS',0,'');
+  d+=delta(A.TS,B.TS,'TS',0,'');
+  d+=delta(A.EL,B.EL,'EL',1,'');
+  d+=delta(A.HV,B.HV,'HV',0,'');
+  d+=delta(A.Ep,B.Ep,'Ep',0,'mV');
+  d+=delta(A.ic,B.ic,'icrit',2,'');
+  d+=delta(A.cost.total,B.cost.total,'원가',0,'$');
+  if(!d) return;
+  let why='';
+  if(kind==='comp'){
+    const dd=B.d-A.d;
+    why=`<span class="d">경로: ${key} 변화 → `
+      +(B.fam==='austenitic'
+        ? `Nieq ${f(A.nieq,2)}→${f(B.nieq,2)}, Md30 ${f(A.md30,0)}→${f(B.md30,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`
+        : `γmax ${f(A.gmax,0)}→${f(B.gmax,0)} %, Ac1 ${f(A.ac1,0)}→${f(B.ac1,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`)
+      +(Math.abs(dd)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`;
+  }else{
+    why=`<span class="d">경로: ${nm} 변화 → 결정립 ${f(A.d,1)}→${f(B.d,1)} µm (ASTM ${f(A.G,1)}→${f(B.G,1)}), `
+      +`DOS ${f(A.DOS,0)}→${f(B.DOS,0)}`
+      +(A.fm!==B.fm?`, 마르텐사이트 ${f(A.fm*100,0)}→${f(B.fm*100,0)} %`:'')+`</span>`;
+  }
+  S.log[k].push(`<b>${nm} → ${(kind==='comp'?S.g[k].comp:S.g[k].proc)[key]}${u}</b>${d}<br>${why}`);
+}
+function logInverse(k,r){
+  const meta=PROP.find(x=>x.k===r.prop);
+  const head=`<b>역설계 · ${meta.n} ${f(r.base,meta.d)} → 목표 ${f(r.target,meta.d)} ${meta.u}</b>`;
+  if(!r.steps.length){
+    S.log[k].push(head+` <span class="dn">달성 불가</span><br>
+      <span class="d">${r.mode==='comp'?'성분':'제조조건'} 조정 범위(규격·설비 한계) 내에서 목표에 도달하는 해가 없습니다.
+      다른 조정 대상을 선택하거나 목표를 완화하십시오.</span>`);
+    return;
+  }
+  const body=r.steps.map(s=>{
+    const nm=s.mode==='comp'?s.knob:PR.find(x=>x.k===s.knob).n;
+    return `${nm} ${f(s.from,s.d)} → ${f(s.to,s.d)} ${s.unit} `
+      +`(감도 ${sgn(s.sens,Math.abs(s.sens)>10?1:2)} ${meta.u}/${s.unit}, `
+      +`${meta.n} ${sgn(s.dP,meta.d)}, 원가 ${sgn(s.dC,1)} $/t)`;
+  }).join('<br>');
+  const rank=r.sens.slice(0,4).map(s=>{
+    const nm=r.mode==='comp'?s.e:PR.find(x=>x.k===s.e).n;
+    return `${nm} ${f(s.eff,2)}`;}).join(' · ');
+  const hit=Math.abs(r.achieved-r.target)<Math.abs(r.target)*0.01;
+  const rej=(r.rejected||[]).map(x=>{
+    const nm=x.mode==='comp'?x.knob:PR.find(y=>y.k===x.knob).n;
+    return `${nm} → ${f(x.to,x.d)} 기각: ${x.why.join(' / ')}`;}).join('<br>');
+  S.log[k].push(head+` <span class="${hit?'up':'dn'}">달성 ${f(r.achieved,meta.d)}</span>`
+    +(hit?'':` <span class="dn">— 규격·조업창 내에서 목표 미달</span>`)+`<br>
+    <span class="d">선정 기준: 단위 원가당 물성 변화량(감도÷원가탄력도)이 큰 순.
+    후보 효율 순위 — ${rank}<br>${body}`
+    +(rej?`<br><b>기각된 후보</b><br>${rej}`:'')+`</span>`);
+}
+
+/* ── 출력부만 갱신 (입력 포커스 유지) ───────────────────────── */
+function refreshOut(){
+  const rv=review();
+  renderTabs(rv); renderBoard(rv);
+  ORDER.forEach(k=>{
+    const bay=document.querySelector(`[data-bay="${k}"]`); if(!bay) return;
+    const R=S.res[k], cons=constraints(k,R), ops=operability(k);
+    const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
+    const chips=[specOK?['ok','A240 적합']:['no','A240 부적합'],
+      cons.filter(x=>x.lv==='wa').length?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상'],
+      ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능'],
+      ['ok',`${f(R.cost.total,0)} USD/t`]];
+    bay.querySelector('.chips').innerHTML=chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('');
+    bay.querySelector('.col.out').innerHTML=
+      `<div class="grp"><div class="grp-h"><h3>기계적 성질</h3>
+        <span class="hint">값을 고쳐 넣으면 역설계</span></div>
+        <div class="props">${propHTML(k,'mech')}</div></div>
+      <div class="grp"><div class="grp-h"><h3>내식성</h3>
+        <span class="u">3.5 % NaCl 30 ℃ / 0.5 M H₂SO₄</span></div>
+        <div class="props">${propHTML(k,'corr')}</div></div>
+      <div class="grp"><div class="grp-h"><h3>야금 지표</h3></div>${idxHTML(k)}</div>
+      <div class="grp"><div class="grp-h"><h3>원가</h3></div>${costHTML(k)}</div>`;
+    const th=bay.querySelector(".thermo"); if(th) th.outerHTML=thermo(k);
+    const sw=bay.querySelector(".sumwrap"); if(sw) sw.innerHTML=summaryHTML(k);
+    const det=bay.querySelector('details.basis');
+    const wasOpen=det.open;
+    det.querySelector('summary').textContent=`설계 근거 · 적용 회귀식 ${R.eq.length}건`;
+    det.querySelector('.basis-body').innerHTML=R.eq.map(e=>
+      `<div class="eq"><h4>${esc(e.h)}</h4><code>${esc(e.f)}</code>
+       <p>${esc(e.t).replace(/\n/g,'<br>')}</p><p class="src">${esc(e.s)}</p></div>`).join('');
+    det.querySelector('.trail').innerHTML=`<div class="trail-h">변경 이력</div>`
+      +(S.log[k].length?S.log[k].slice(-14).reverse().map(e=>`<div class="entry">${e}</div>`).join('')
+        :'<div class="empty">변경 없음 — 기준 설계값</div>');
+    det.open=wasOpen;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   10. 상단 툴바
+   ══════════════════════════════════════════════════════════════ */
+$('#btnReset').onclick=()=>{ initState(); render(); renderSuggest(); renderThread(); };
+$('#btnFix').onclick=()=>{
+  const ap=autoFix(); S.tab=REVIEW_TAB; render();
+  const rv=review();
+  ask(rv.pass
+    ?`자동 개선 완료 — 페르소나 전원 ${rv.min.toFixed(1)}점 이상 달성`
+    :`자동 개선 시도 — 현재 최저 ${rv.min.toFixed(1)}점`,
+    `<p>${ap.length?'적용된 변경 '+ap.length+'건:':'적용 가능한 자동 개선안이 없습니다. 지적사항이 상충하거나 이미 한계값입니다.'}</p>`
+    +(ap.length?`<ul>${ap.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'')
+    +`<p>${rv.pass?'페르소나 5인 전원이 9.0 이상으로 <b>설계 승인</b> 상태입니다.'
+      :'남은 지적사항은 페르소나 보드의 ▲ 표시 항목입니다.'}</p>`);
+};
+$('#btnNi').onclick=()=>{
+  const res=[];
+  ORDER.forEach(k=>{
+    const nc=niCut(k); if(!nc) return;
+    Object.keys(nc.c).forEach(e=>{ if(Math.abs(nc.c[e]-S.g[k].comp[e])>1e-9) S.g[k].solved[e]=1; });
+    const before=S.res[k]; const prevNi=S.g[k].comp.Ni;
+    S.g[k].comp={...nc.c}; recalc();
+    const A=S.res[k];
+    S.log[k].push(`<b>Ni 절감 최적화</b> <span class="up">원가 −${f(nc.save,0)} $/t</span><br>
+      <span class="d">Ni ${f(before.cost.brk.Ni/10/S.prices.Ni,2)} → ${f(S.g[k].comp.Ni,2)} wt%,
+      N +${f(nc.dN,3)}, Cu +${f(nc.dCu,2)}, Mn +${f(nc.dMn,2)}<br>
+      제약 유지: Md30 ${f(before.md30,0)}→${f(A.md30,0)} ℃ (±12 이내), PREN ${f(before.pren,1)}→${f(A.pren,1)},
+      δ@1300 ${f(A.dCast,1)} %, FN ${f(A.FN,1)}, YS ${f(A.YS,0)} / TS ${f(A.TS,0)} / EL ${f(A.EL,1)} 모두 A240 충족<br>
+      근거: Nieq = Ni+22C+14.2N+0.31Mn+Cu 에서 N은 Ni의 14.2배, Cu는 1배 오스테나이트 안정화 효과를 내지만
+      단가는 N $${S.prices.N}/kg · Cu $${S.prices.Cu}/kg 대 Ni $${S.prices.Ni}/kg 이므로 등가 안정화당 비용이 낮음</span>`);
+    snap(k,"Ni",prevNi,S.g[k].comp.Ni,2,"wt%","최소원가 최적화 · 성분 치환",before,A,
+      "Nieq = Ni+22C+14.2N+0.31Mn+Cu 에서 N 의 계수는 14.2, Cu 는 1.0 입니다. 즉 N 1 kg 이 Ni 14.2 kg 의 오스테나이트 안정화 효과를 내면서 단가는 훨씬 낮으므로, Md30 등가를 유지한 채 Ni 를 덜어낼 수 있습니다.");
+    res.push(`${GRADES[k].label}: Ni −${nc.dNi.toFixed(2)} wt% → −${nc.save.toFixed(0)} USD/t`);
+  });
+  render();
+  ask('Ni 절감 최적화',res.length
+    ?`<p>Md30 ±12 ℃, PREN, δ@1300 ℃, 용접 FN, A240 기계적 규격을 모두 유지하는 조건에서
+       N·Cu·Mn 으로 Ni 를 치환했습니다.</p><ul>${res.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>`
+    :'<p>현재 설계에서 제약을 유지하며 추가로 절감 가능한 Ni 여유가 없습니다. 이미 최소 원가 근방입니다.</p>');
+};
+$('#btnPrices').onclick=()=>{
+  const box=$('#priceBox');
+  box.hidden=!box.hidden;
+  if(!box.hidden) box.querySelector('input').focus();
+};
+
+/* ── 탭 전환 ────────────────────────────────────────────────── */
+$('#tabs').addEventListener('click',e=>{
+  const b=e.target.closest('[data-tab]'); if(!b) return;
+  S.tab=b.dataset.tab;
+  renderTabs(); applyTab();
+  window.scrollTo({top:$('#tabs').offsetTop-14,
+    behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+});
+/* ══════════════════════════════════════════════════════════════
+   11. 원료 단가 패널
+   ══════════════════════════════════════════════════════════════ */
+function renderPrices(){
+  const box=$('#priceBox');
+  box.innerHTML=`<div class="grp-h"><h3>원료 단가</h3>
+    <span class="u">USD / kg 함유원소 · Fe는 스크랩·DRI 기준</span>
+    <span class="hint">변경 즉시 3개 강종 원가와 그린 평가에 반영</span></div>
+    <div class="fields c13">${Object.keys(S.prices).map(e=>
+      `<div class="f"><label>${e}</label>
+       <input type="number" step="0.05" min="0" value="${S.prices[e]}" data-price="${e}"
+       aria-label="${e} 단가"></div>`).join('')}</div>`;
+  box.addEventListener('input',e=>{
+    const el=e.target.dataset.price; if(!el) return;
+    const v=parseFloat(e.target.value); if(!isFinite(v)||v<0) return;
+    S.prices[el]=v; recalc(); refreshOut();
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   12. 설계 문의 — 현재 계산 상태를 읽어 답변
+   ══════════════════════════════════════════════════════════════ */
+function which(q){
+  for(const k of ORDER) if(q.includes(k)) return k;
+  if(/fully.?ferrite|완전\s*페라이트|풀\s*페라이트/i.test(q)) return '439';
+  if(/semi.?ferrite|반\s*페라이트|세미/i.test(q)) return '430';
+  if(/austenit|오스테나이트|300계/i.test(q)) return '304';
+  if(/martensit|마르텐사이트/i.test(q)) return '410';
+  if(/ferrit|페라이트|400계/i.test(q)) return '430';
+  return null;
+}
+const tbl=(head,rows)=>`<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+
+const INTENTS=[
+ {kw:['델타','페라이트','delta','δ','응고','열간연성','에지크랙'],ex:['ferrit'],
+  fn:(q,k)=>{k=k||'304';const R=S.res[k];
+   return `<p><b>${GRADES[k].label}</b> 의 δ-페라이트는 Hammar–Svensson 당량을 Hull 식에 넣어 계산합니다.
+   γ 안정성이 온도에 따라 변하므로 경계항 b(T)에 온도 의존성을 두었습니다.</p>
+   <pre>Creq = Cr+1.37Mo+1.5Si+2Nb+3Ti      = ${f(R.creq,2)}
+Nieq = Ni+22C+14.2N+0.31Mn+Cu       = ${f(R.nieq,2)}
+b(T) = 6.7 + (1300 − T)×0.0157
+δ%   = 3·[Creq − 0.93·Nieq − b(T)]</pre>
+   ${tbl(['온도','b(T)','δ %','의미'],[
+     ['1300 ℃ (재가열)',f(bT(1300),2),f(R.dCast,1),'열간압연 연성 — 2~10 % 권장'],
+     ['가열로 '+S.g[k].proc.rhfT+' ℃',f(bT(Math.min(S.g[k].proc.rhfT,1300)),2),f(R.dHot,1),'슬라브 소킹 시 잔류량'],
+     ['최종소둔 '+S.g[k].proc.crAnnT+' ℃',f(bT(S.g[k].proc.crAnnT),2),R.dFin!==null?f(R.dFin,2):'—',
+      R.fam==='austenitic'?'제품 잔류 δ — 1 % 이하 목표':'페라이트 기지이므로 해당 없음']])}
+   <p>현재 1300 ℃ 기준 <b>${f(R.dCast,1)} %</b> 로 ${R.dCast<2?'<b>2 % 미만</b> — 완전 오스테나이트 응고 모드가 되어 고온균열 위험이 있습니다. Cr을 올리거나 Ni를 낮추십시오.'
+   :R.dCast>10?'<b>10 % 초과</b> — 열간압연 중 δ/γ 계면에서 에지크랙이 발생합니다. Ni·N·Cu 를 올려 Nieq 를 높이십시오.'
+   :'적정 범위(2~10 %)입니다. FA 응고모드로 고온균열 저항이 확보됩니다.'}</p>
+   <p>WRC-1992 기준 용접부 페라이트수는 <b>FN ${f(R.FN,1)}</b> 입니다 (권장 3~12).</p>`;}},
+
+ {kw:['md30','가공유기','trip','마르텐사이트 변태','α′','알파프라임','자성','자화'],
+  fn:(q,k)=>{k=k||'304';const R=S.res[k];
+   if(R.fam!=='austenitic') return `<p><b>${GRADES[k].label}</b> 은 ${GRADES[k].famKo}이므로 Md30(가공유기 마르텐사이트) 개념이 적용되지 않습니다.
+     대신 Ms = <b>${f(R.msMar,0)} ℃</b> (Andrews 식) 로, 냉각만으로 마르텐사이트가 생성됩니다.
+     현재 최종 소둔 ${S.g[k].proc.crAnnT} ℃ 는 Ac1 ${f(R.ac1,0)} ℃ ${S.g[k].proc.crAnnT<R.ac1?'미만이므로 마르텐사이트가 생기지 않습니다':'이상이므로 마르텐사이트 '+f(R.fm*100,0)+' % 가 생성됩니다'}.</p>`;
+   return `<p>Md30 은 30 % 변형 시 마르텐사이트가 50 % 생기는 온도입니다. Nohara 식은 결정립도 항을 포함해 공정 영향까지 반영합니다.</p>
+   <pre>Md30 = 551 − 462(C+N) − 9.2Si − 8.1Mn − 13.7Cr
+        − 29(Ni+Cu) − 18.5Mo − 68Nb − 1.42(ν−8)
+     ν = ASTM ${f(R.G,1)} (d = ${f(R.d,1)} µm)
+Md30 = ${f(R.md30,1)} ℃      Angel 식(립도항 없음) = ${f(R.md30A,1)} ℃</pre>
+   ${tbl(['항','계수 × 함량','기여 ℃'],[
+     ['C+N',`462 × ${f(S.g[k].comp.C+S.g[k].comp.N,3)}`,f(-462*(S.g[k].comp.C+S.g[k].comp.N),1)],
+     ['Cr',`13.7 × ${f(S.g[k].comp.Cr,2)}`,f(-13.7*S.g[k].comp.Cr,1)],
+     ['Ni+Cu',`29 × ${f(S.g[k].comp.Ni+S.g[k].comp.Cu,2)}`,f(-29*(S.g[k].comp.Ni+S.g[k].comp.Cu),1)],
+     ['Mn',`8.1 × ${f(S.g[k].comp.Mn,2)}`,f(-8.1*S.g[k].comp.Mn,1)],
+     ['Si',`9.2 × ${f(S.g[k].comp.Si,2)}`,f(-9.2*S.g[k].comp.Si,1)]])}
+   <p>Md30 = ${f(R.md30,1)} ℃ → 상온 인장 시 30 % 변형점에서 α′ <b>${f(R.V30,1)} %</b> 생성,
+   인장강도에 <b>+${f(R.trip,0)} MPa</b> 기여합니다.</p>
+   <p>연신율은 Md30 이 약 <b>+10 ℃</b> 부근일 때 최대가 됩니다. TRIP 이 국부 네킹을 지연시키기 때문입니다.
+   현재 최적점에서 ${f(Math.abs(R.md30-10),0)} ℃ 벗어나 연신 손실 <b>${f(0.008*Math.pow(R.md30-10,2),1)} %p</b> 입니다.
+   ${R.md30>40?'Md30 이 너무 높아 성형 후 자성 발현·시효균열 위험이 있습니다.'
+    :R.md30<-40?'Md30 이 너무 낮아 TRIP 효과를 못 쓰고 있습니다. Ni·Cu·N 을 낮추면 강도·연신이 함께 오릅니다.':''}</p>`;}},
+
+ {kw:['감마','γmax','gamma','오스테나이트량'],
+  fn:(q,k)=>{k=k||'430';const R=S.res[k],c=S.g[k].comp;
+   return `<p><b>${GRADES[k].label}</b> 의 γmax(가열 시 생성 가능한 최대 오스테나이트량)입니다.</p>
+   <pre>%γmax = 420C + 470N + 23Ni + 9Cu + 7Mn
+        − 11.5Cr − 11.5Si − 12Mo − 47Nb − 49Ti − 52Al + 189
+      = ${f(R.gmax,1)} %</pre>
+   ${tbl(['γ 안정화','기여','α 안정화','기여'],[
+     ['C 420×'+f(c.C,3),f(420*c.C,1),'Cr 11.5×'+f(c.Cr,2),f(-11.5*c.Cr,1)],
+     ['N 470×'+f(c.N,3),f(470*c.N,1),'Si 11.5×'+f(c.Si,2),f(-11.5*c.Si,1)],
+     ['Ni 23×'+f(c.Ni,2),f(23*c.Ni,1),'Ti 49×'+f(c.Ti,3),f(-49*c.Ti,1)],
+     ['Mn 7×'+f(c.Mn,2),f(7*c.Mn,1),'Nb 47×'+f(c.Nb,3),f(-47*c.Nb,1)]])}
+   <p>Kaltenhauser 페라이트 인자 <b>KFF = ${f(R.kff,2)}</b> (= Cr+6Si+8Ti+4Mo+2Al−2Mn−4Ni−40(C+N)).
+   13.5 미만이면 냉각 중 마르텐사이트가 생겨 용접부·소둔재가 경화됩니다.</p>
+   <p>${R.fam==='martensitic'
+     ?`410 은 완전 경화가 목적이므로 γmax ≥ 90 % 가 필요합니다. 현재 <b>${f(R.gmax,0)} %</b> — ${R.gmax>=90?'충족':'미달, C 또는 N 을 올리십시오'}.`
+     :`430 은 γmax 가 65 % 를 넘으면 마르텐사이트 과다로 연성이 급락합니다. 현재 <b>${f(R.gmax,0)} %</b> — ${R.gmax<=65?'적정':'과다, Cr·Si·Ti·Nb 를 올리십시오'}.`}</p>`;}},
+
+ {kw:['ac1','ac3','변태점','변태온도','임계'],
+  fn:(q,k)=>{k=k||'410';const R=S.res[k],p=S.g[k].proc;
+   if(R.fam==='austenitic') return `<p>304 는 상온~용융까지 오스테나이트 단상역이므로 Ac1/Ac3 변태점이 존재하지 않습니다.
+     대신 δ 용해온도와 σ상 석출역(600~900 ℃)이 소둔 설계 기준이 됩니다.</p>`;
+   return `<p><b>${GRADES[k].label}</b> 변태점과 소둔온도의 관계입니다. 이것이 400계 설계의 핵심 분기점입니다.</p>
+   <pre>Ac1 = 720 + 12Cr + 25Si + 30Mo + 40Nb + 60Ti + 45Al
+      − 25Mn − 30Ni − 15Cu − 250C − 400N   = ${f(R.ac1,0)} ℃
+Ac3 = Ac1 + 90 − 200C + 3Cr                 = ${f(R.ac3,0)} ℃</pre>
+   ${tbl(['공정','온도 ℃','Ac1 대비','결과'],[
+     ['열연 FDT',p.fdt,p.fdt>R.ac1?'초과':'미만',p.fdt>R.ac1?'오스테나이트역 압연':'페라이트역 압연'],
+     ['권취 CT',p.ct,p.ct>R.ac1?'초과':'미만',p.ct>R.ac1?'권취 후 변태':'코일 내 템퍼링'],
+     ['열연소둔',p.hrAnnT,p.hrAnnT>R.ac1?'초과':'미만',p.hrAnnT>R.ac1?'재경화 — 아임계로 낮출 것':'완전 연화 (구상화)'],
+     ['냉연소둔',p.crAnnT,p.crAnnT>R.ac1?'초과':'미만',
+      p.crAnnT>R.ac1?`마르텐사이트 ${f(R.fm*100,0)} % → HV ${f(R.HV,0)}`:'완전 연화']])}
+   <p>현재 냉연 소둔 <b>${p.crAnnT} ℃</b> 는 Ac1 ${f(R.ac1,0)} ℃ ${p.crAnnT>R.ac1?'을 넘습니다':'미만입니다'}.
+   ${p.crAnnT>R.ac1
+     ?`오스테나이트로 변태한 부분이 냉각 중 마르텐사이트가 되어 경도 HV ${f(R.HV,0)}, 연신 ${f(R.EL,1)} % 입니다.
+        Ms = ${f(R.msMar,0)} ℃ 이므로 상온까지 거의 완전 변태합니다.`
+     :`탄화물이 구상화된 연질 페라이트 조직으로 YS ${f(R.YS,0)} MPa, EL ${f(R.EL,1)} % 입니다.
+        소둔온도를 Ac1 위로 ${f(R.ac1-p.crAnnT+10,0)} ℃ 만 올려도 물성이 급변하니 조업 편차 관리가 중요합니다.`}</p>`;}},
+
+ {kw:['pren','내식','부식','공식','전위','pitting','염화물'],
+  fn:(q,k)=>{const ks=k?[k]:ORDER;
+   return `<p>공식전위는 PREN 을 기본항으로 하고, 조직·개재물 인자를 감점으로 반영합니다.</p>
+   <pre>PREN = Cr + 3.3Mo + 16N
+Epit = −75 + 21·PREN + 계열보정 + ΔS + Δ예민화 + ΔTi + Δ결정립</pre>
+   ${tbl(['강종','PREN','기본항','계열','ΔS','Δ예민화','Δ립경','Epit mV'],
+     ks.map(g=>{const R=S.res[g];return [GRADES[g].label,f(R.pren,1),f(-75+21*R.pren,0),
+       f(R.famOff,0),f(R.dS,0),f(R.dSens,0),f(R.dGr,0),`<b>${f(R.Ep,0)}</b>`];}))}
+   <p>계열보정은 기지상 차이입니다 — 오스테나이트 0, 페라이트 −50, 마르텐사이트 −60 mV.
+   같은 PREN 이어도 BCC 기지는 Cr 확산이 빨라 국부 결핍이 쉽고, 마르텐사이트는 격자 변형으로 부동태 피막이 불안정합니다.</p>
+   <p>ΔS 는 MnS 개재물 항입니다: <code>ΔS = −60·(log₁₀S% + 3.7)</code>.
+   S 를 ${(S.g[ks[0]].comp.S*1e4).toFixed(0)} ppm 에서 절반으로 낮추면 Epit 이 약 <b>+18 mV</b> 개선되지만
+   심탈황 비용이 <b>+${f(45*L10(2),0)} USD/t</b> 발생합니다.</p>
+   ${tbl(['강종','icrit mA/cm²','판정'],ks.map(g=>{const R=S.res[g];
+     return [GRADES[g].label,f(R.ic,2),R.ic<2?'부동태화 용이':R.ic<8?'보통':'난부동태'];}))}
+   <p>임계전류밀도는 <code>log icrit = 5.35 − 0.105Cr − 0.16Mo − 0.22Cu − 0.045Ni − 0.06Si + 1.6C + 0.010·DOS</code>
+   로, Cu 와 Mo 의 계수가 가장 큽니다. Cu 0.3 % 추가는 icrit 을 약 20 % 낮춥니다.</p>`;}},
+
+ {kw:['예민화','sensitiz','입계','dos','cr결핍','크롬결핍','안정화','ti','nb','탄화물'],
+  fn:(q,k)=>{k=k||'430';const R=S.res[k],c=S.g[k].comp;
+   return `<p><b>${GRADES[k].label}</b> 의 입계 Cr 결핍(예민화) 평가입니다.</p>
+   <pre>Ti → N 우선 고정(TiN, Ti/N = 3.42) → 잔여 Ti 가 C 고정(TiC, Ti/C = 4.0)
+Nb → 잔여 C 고정 (NbC, Nb/C = 7.75)
+Ceff = ${f(R.Ceff,4)} %   Neff = ${f(R.Neff,4)} %
+고용 C = ${f(R.dosC,4)} %  (${R.fam==='austenitic'?'γ 중 전량 고용':'ferrite 고용도 한계 적용'})
+850→550 ℃ 체류 ${f(R.tCool,0)} s  vs  TTS 노즈 ${f(R.tNose,1)} s
+DOS = ${f(R.DOS,0)} / 100  →  Epit ${f(R.dSens,0)} mV</pre>
+   <p>${R.fam==='austenitic'
+     ? `오스테나이트는 C 확산이 느려 노즈시간이 ${f(R.tNose,0)} s 로 깁니다. 연속소둔의 급냉으로 대부분 회피됩니다.
+        C 를 0.03 % 이하(L 급)로 낮추면 노즈시간이 약 10배 길어집니다.`
+     : `페라이트는 C 확산이 오스테나이트의 약 100배로 빨라 노즈시간이 <b>${f(R.tNose,1)} s</b> 에 불과합니다.
+        급냉만으로는 회피가 불가능하고, <b>Ti·Nb 안정화</b>가 유일한 해법입니다.`}</p>
+   <p>완전 안정화에 필요한 양: Ti ≥ ${f(3.42*c.N+4*Math.max(0,c.C-c.Nb/7.75),3)} % 또는
+   Nb ≥ ${f(7.75*R.Ceff,3)} %. 현재 Ti ${f(c.Ti,3)} / Nb ${f(c.Nb,3)} %.
+   ${R.Ceff>0.005?`<b>${f(R.Ceff,4)} % 의 C 가 미고정</b> 상태입니다.`:'C 가 충분히 고정되어 있습니다.'}</p>
+   <p>단, Ti 안정화는 TiN 개재물이 공식 기점이 되어 <code>ΔTi = −100·max(0, Ti−0.05)</code> 만큼 Epit 을 깎습니다.
+   Nb 안정화(441계)가 표면품질과 내식성 양쪽에서 유리하지만 FeNb 단가가 $${S.prices.Nb}/kg 으로 FeTi 의 ${f(S.prices.Nb/S.prices.Ti,1)}배입니다.</p>`;}},
+
+ {kw:['결정립','립경','grain','astm','hall','petch','소둔온도','소둔속도','재결정'],
+  fn:(q,k)=>{k=k||'304';const R=S.res[k],p=S.g[k].proc;
+   return `<p><b>${GRADES[k].label}</b> 의 결정립 이력입니다. 소둔온도·속도가 물성으로 이어지는 주 경로입니다.</p>
+   <pre>d^n − d₀^n = k₀·exp(−Q/RT)·t·Z      n = ${GG[R.fam==='austenitic'?'austenitic':'ferritic'].n},
+Q = ${GG[R.fam==='austenitic'?'austenitic':'ferritic'].Q/1000} kJ/mol,  Z(Zener 핀닝) = ${f(R.pin,2)}
+소둔 유효시간 t = 45 m ÷ 라인속도</pre>
+   ${tbl(['단계','조건','입경 µm','ASTM'],[
+     ['열연판',`FDT ${p.fdt} ℃, CT ${p.ct} ℃`,f(R.dHB,1),f(astmG(R.dHB),1)],
+     ['열연소둔 후',`${p.hrAnnT} ℃ × ${f(R.tHR,0)} s`,f(R.dHRA,1),f(astmG(R.dHRA),1)],
+     ['냉연 재결정',`압하율 ${f(R.crRed,1)} %`,f(R.d0,1),f(astmG(R.d0),1)],
+     ['최종',`${p.crAnnT} ℃ × ${f(R.tCR,0)} s`,`<b>${f(R.d,1)}</b>`,`<b>${f(R.G,1)}</b>`]])}
+   <p>Hall–Petch 기여: ${R.fam==='austenitic'
+     ?`Pickering 식의 <code>0.46·d^−½</code> 항 = <b>${f(15.4*0.46*Math.pow(R.d/1000,-0.5),0)} MPa</b>`
+     :`<code>ky·d^−½</code>, ky = 0.6 MPa·m^½ = <b>${f(18.97*Math.pow(R.d/1000,-0.5),0)} MPa</b>`} (전체 YS ${f(R.YS,0)} MPa 중)</p>
+   <p>소둔온도를 <b>±25 ℃</b> 바꾸면 입경이 ${(()=>{const a=trial(k,'proc','crAnnT',p.crAnnT-25),
+     b=trial(k,'proc','crAnnT',p.crAnnT+25);
+     return `${f(a.d,1)} ~ ${f(b.d,1)} µm 로 변하고 YS 가 ${f(a.YS,0)} ~ ${f(b.YS,0)} MPa 로 움직입니다`;})()}.
+   라인속도를 올리면 유효시간이 줄어 같은 온도에서도 입경이 작아집니다 —
+   ${(()=>{const b=trial(k,'proc','crAnnV',Math.min(150,p.crAnnV+30));
+     return `${p.crAnnV} → ${Math.min(150,p.crAnnV+30)} m/min 시 d ${f(R.d,1)} → ${f(b.d,1)} µm, YS ${f(R.YS,0)} → ${f(b.YS,0)} MPa`;})()}.</p>`;}},
+
+ {kw:['원가','비용','cost','단가','ni','니켈','절감','싸','저렴','경제'],
+  fn:(q,k)=>{const ks=k?[k]:ORDER;
+   const rows=ks.map(g=>{const R=S.res[g],C=R.cost;
+     return [GRADES[g].label,f(C.brk.Ni,0),f(C.brk.Cr,0),f(C.brk.Fe,0),f(C.refine,0),f(C.conv,0),`<b>${f(C.total,0)}</b>`,
+       sgn((C.total-GRADES[g].refCost)/GRADES[g].refCost*100,1)+' %'];});
+   const k0=ks[0], nc=niCut(k0);
+   return `<p>USD / 톤 냉연 코일 기준 원가 구조입니다.</p>
+   ${tbl(['강종','Ni','Cr','Fe','정련','가공','합계','벤치마크 대비'],rows)}
+   <p>304 의 원가는 <b>Ni 단가에 거의 선형으로 종속</b>됩니다. Ni 1 % 는
+   10 kg/t × $${S.prices.Ni}/kg = <b>$${f(10*S.prices.Ni,0)}/t</b> 이며, 이는 Cr 1 %(${f(10*S.prices.Cr,0)})의 ${f(S.prices.Ni/S.prices.Cr,1)}배입니다.</p>
+   <p>정련 페널티는 규격 하한을 과도하게 밑돌 때 발생하는 실비입니다:
+   <code>S: 45·log₁₀(0.010/S)</code>, <code>P: 30·log₁₀(0.030/P)</code>,
+   <code>C&lt;0.03: 1500·(0.03−C)</code>, <code>N&lt;0.02: 900·(0.02−N)</code>.
+   현재 ${GRADES[k0].label} 의 정련비 <b>$${f(S.res[k0].cost.refine,0)}/t</b> 중 탈황이 $${f(S.res[k0].cost.sPen,0)} 입니다.</p>
+   ${nc?`<p><b>절감 여지</b> — ${GRADES[k0].label} 에서 Ni 를 ${f(nc.dNi,2)} % 줄이고
+     N +${f(nc.dN,3)} · Cu +${f(nc.dCu,2)} · Mn +${f(nc.dMn,2)} 로 치환하면
+     Md30·PREN·δ·FN·A240 기계적 규격을 모두 유지한 채 <b>$${f(nc.save,0)}/t</b> 를 절감합니다.
+     상단 <b>Ni 절감 최적화</b> 버튼으로 적용할 수 있습니다.</p>
+     <p>근거: Nieq 식에서 N 의 계수는 14.2, Cu 는 1.0, Mn 은 0.31 입니다. 즉 N 1 kg 은 Ni 14.2 kg 의 오스테나이트
+     안정화 효과를 내면서 단가는 $${S.prices.N} 대 $${f(14.2*S.prices.Ni,0)} 입니다.</p>`
+    :`<p>현재 설계는 제약조건 하에서 이미 최소원가 근방입니다.</p>`}
+   <p>가공비는 소둔온도·라인속도에 직접 반응합니다:
+   <code>16·(T/900)^1.9 + 850/V</code>. 속도를 올리면 톤당 고정비가 줄지만 결정립이 작아져 강도가 오르므로
+   물성 목표와 함께 봐야 합니다.</p>`;}},
+
+ {kw:['리징','ridging','r값','rbar','성형','deep draw','디프','오렌지'],
+  fn:(q,k)=>{k=k||'430';const R=S.res[k],p=S.g[k].proc;
+   if(R.fam==='austenitic') return `<p>304 는 FCC 라 r̄ ≈ 0.9~1.1 로 낮고 리징도 발생하지 않습니다.
+     대신 TRIP(Md30 ${f(R.md30,0)} ℃)이 균일연신을 지배하며, 현재 EL <b>${f(R.EL,1)} %</b> 입니다.
+     연신 최대점은 Md30 ≈ +10 ℃ 입니다.</p>`;
+   return `<p><b>${GRADES[k].label}</b> 의 성형성 지표입니다.</p>
+   ${tbl(['지표','값','목표','인자'],[
+     ['r̄ (Lankford)',f(R.rbar,2),'≥ 0.95','냉간압하율, 열연소둔, 고용 C+N, Nb+Ti'],
+     ['리징지수',f(R.ridge,1)+' /10','≤ 6','열연 입경, 압하율, FDT, 열연소둔'],
+     ['열연 입경',f(R.dHB,1)+' µm','작을수록 유리','FDT '+p.fdt+' ℃, CT '+p.ct+' ℃'],
+     ['냉간압하율',f(R.crRed,1)+' %','70~85 %','열연 '+p.hrT+' → 냉연 '+p.crT+' mm']])}
+   <p>리징은 주조 주상정에서 물려온 {100} 집합조직 콜로니가 냉간압연 후에도 남아 생깁니다. 대책 순서는
+   ① 열연 FDT 를 낮춰 페라이트역 압연으로 변형 축적 → ② 열연소둔(850 ℃ 이상)으로 재결정 → ③ 냉간압하율 70 % 이상 확보입니다.</p>
+   <p>현재 FDT ${p.fdt} ℃ 를 ${p.fdt-30} ℃ 로 낮추면 리징지수가
+   ${f(trial(k,'proc','fdt',p.fdt-30).ridge,1)} 로 개선됩니다.
+   Nb·Ti 안정화로 고용 C+N 을 없애면 {111} 집합조직이 발달해 r̄ 이 1.6 이상까지 올라갑니다(439/441 강종의 원리).</p>`;}},
+
+ {kw:['용접','weld','fn','시그마','σ상','sigma'],
+  fn:(q,k)=>{const ks=k?[k]:ORDER;
+   return `<p>용접 응고 조직은 WRC-1992 당량으로 평가합니다.</p>
+   <pre>Creq = Cr + Mo + 0.7Nb        Nieq = Ni + 35C + 20N + 0.25Cu
+FN ≈ 3.34·Creq − 2.46·Nieq − 28.6</pre>
+   ${tbl(['강종','Creq','Nieq','FN','판정'],ks.map(g=>{const c=S.g[g].comp,R=S.res[g];
+     return [GRADES[g].label,f(creqWRC(c),2),f(nieqWRC(c),2),f(R.FN,1),
+       R.FN<3?'고온균열 위험':R.FN>12?'σ상 취화 위험':'양호'];}))}
+   <p>FN 3~12 가 권장역입니다. 3 미만이면 완전 오스테나이트 응고로 S·P 가 입계에 편석해 고온균열이 나고,
+   12 초과면 600~900 ℃ 노출 시 σ상이 석출해 취화합니다.</p>
+   <p>400계는 HAZ 마르텐사이트가 문제입니다. KFF = ${ks.map(g=>`${GRADES[g].label} ${f(S.res[g].kff,2)}`).join(', ')}
+   — 13.5 미만이면 용접부가 경화되므로 Ti·Nb 안정화 또는 Al 첨가로 KFF 를 올립니다.</p>`;}},
+
+ {kw:['시장','수요','판매','경쟁','marketab','옐로'],
+  fn:(q,k)=>{const rv=review();
+   return `<p>옐로(마케터) 평가 <b>${rv.yellow.score.toFixed(1)} / 10</b></p>
+   ${tbl(['강종','A240 성분','A240 기계','원가 대비','수요'],ORDER.map(g=>{
+     const G=GRADES[g],R=S.res[g],c=S.g[g].comp;
+     const so=Object.entries(G.spec).filter(([e,[lo,hi]])=>c[e]<lo-1e-9||(hi!==null&&c[e]>hi+1e-9)).length;
+     const mf=Object.entries(G.mech).filter(([m,[lo,hi]])=>(lo!==null&&R[m]<lo)||(hi!==null&&R[m]>hi)).map(([m])=>m);
+     return [G.label,so?`${so}항목 이탈`:'적합',mf.length?mf.join(',')+' 미달':'적합',
+       sgn((R.cost.total-G.refCost)/G.refCost*100,1)+' %',G.demand];}))}
+   <ul>${rv.yellow.notes.map(n=>`<li>${n.hit?'▲ ':''}${esc(n.txt)}</li>`).join('')}</ul>
+   <p>규격 범위를 벗어난 성분은 표준강종으로 팔 수 없고 고객별 승인(수요가 재질 심사)이 필요해
+   판매 리드타임이 6~12개월 늘어납니다. 원가 우위가 5 % 미만이면 개발강종화는 통상 수지가 맞지 않습니다.</p>`;}},
+
+ {kw:['검증','페르소나','점수','레드','그린','블루','평가','review'],
+  fn:()=>{const rv=review();
+   return `<p>페르소나 5인 합의 판정 — 최저 <b>${rv.min.toFixed(1)} / 10</b> ${rv.pass?'(승인)':'(미통과, 기준 9.0)'}</p>
+   ${tbl(['페르소나','역할','점수','주요 지적'],PERSONAS.map(p=>{const o=rv[p.id];
+     const hits=o.notes.filter(n=>n.hit);
+     return [p.n,p.r,`<b>${o.score.toFixed(1)}</b>`,
+       hits.length?esc(hits[0].txt):'지적사항 없음'];}))}
+   ${PERSONAS.filter(p=>rv[p.id].score<10).map(p=>
+     `<p><b>${p.n}</b> — ${rv[p.id].notes.filter(n=>n.hit).map(n=>esc(n.txt)).join(' / ')||'감점 없음'}</p>`).join('')}
+   <p>상단 <b>자동 개선</b> 버튼은 지적사항을 감점 순으로 최대 14회 반복 적용합니다.</p>`;}},
+
+ {kw:['왜','근거','이유','바뀌','변경','why','설명','어떻게'],
+  fn:(q,k)=>{const ks=k?[k]:ORDER;
+   const has=ks.filter(g=>S.log[g].length);
+   if(!has.length) return `<p>아직 변경 이력이 없습니다. 제조조건이나 물성 값을 수정하면
+     적용된 회귀식과 계산 경로가 각 강종 하단 <b>설계 근거</b>에 기록됩니다.</p>`;
+   return has.map(g=>`<p><b>${GRADES[g].label}</b></p>
+     ${S.log[g].slice(-4).reverse().map(e=>`<p style="border-left:2px solid var(--edit);padding-left:9px">${e}</p>`).join('')}`).join('');}},
+
+ {kw:['비교','차이','대비','compare','어느','추천'],
+  fn:()=>{const ks=ORDER;
+   return `<p>4개 계열 현재 설계 비교입니다.</p>
+   ${tbl(['항목',...ks.map(k=>GRADES[k].label)],[
+     ['기지상',...ks.map(k=>GRADES[k].famKo)],
+     ['YS MPa',...ks.map(k=>f(S.res[k].YS,0))],
+     ['TS MPa',...ks.map(k=>f(S.res[k].TS,0))],
+     ['EL %',...ks.map(k=>f(S.res[k].EL,1))],
+     ['HV',...ks.map(k=>f(S.res[k].HV,0))],
+     ['Epit mV',...ks.map(k=>f(S.res[k].Ep,0))],
+     ['icrit mA/cm²',...ks.map(k=>f(S.res[k].ic,2))],
+     ['PREN',...ks.map(k=>f(S.res[k].pren,1))],
+     ['결정립 µm',...ks.map(k=>f(S.res[k].d,1))],
+     ['총원가 $/t',...ks.map(k=>`<b>${f(S.res[k].cost.total,0)}</b>`)],
+     ['$/t per MPa YS',...ks.map(k=>f(S.res[k].cost.total/S.res[k].YS,2))]])}
+   <p>304 는 원가의 ${f(S.res['304'].cost.brk.Ni/S.res['304'].cost.total*100,0)} % 가 Ni 입니다.
+   430 은 304 대비 원가가 ${f((1-S.res['430'].cost.total/S.res['304'].cost.total)*100,0)} % 낮지만
+   Epit 이 ${f(S.res['304'].Ep-S.res['430'].Ep,0)} mV 열위이고 EL 이 ${f(S.res['304'].EL-S.res['430'].EL,1)} %p 낮습니다.
+   염화물 환경이 아니고 심가공이 아니라면 430 이 합리적 대체입니다.</p>`;}}
+];
+function answer(q){
+  const k=which(q), ql=q.toLowerCase();
+  let best=null,bs=0;
+  INTENTS.forEach(it=>{
+    let s=0; it.kw.forEach(w=>{ if(ql.includes(w.toLowerCase())) s+=w.length>=3?2:1; });
+    if(s>bs){bs=s;best=it;}
+  });
+  if(!best) return `<p>다음 주제로 물어보시면 현재 계산 상태 기준으로 답변합니다.</p>
+    <ul><li>델타페라이트 · 응고모드 · 열간연성</li><li>Md30 · 가공유기 마르텐사이트 · TRIP</li>
+    <li>γmax · Kaltenhauser 인자 · Ac1/Ac3 변태점</li><li>PREN · 공식전위 · 임계전류밀도</li>
+    <li>예민화 · Ti/Nb 안정화</li><li>결정립 · 소둔온도/속도 · Hall–Petch</li>
+    <li>성분원가 · Ni 절감</li><li>리징 · r값 · 성형성</li><li>용접 FN · σ상</li>
+    <li>시장성 · 페르소나 검증 결과</li><li>강종 비교</li><li>방금 왜 바뀌었나</li></ul>
+    <p>계열명(Austenite / Martensite / Semi-Ferrite / Fully-Ferrite) 또는 강종번호(304 / 410 / 430 / 439)를 함께 쓰면 그 기준으로 답합니다.</p>`;
+  return best.fn(ql,k);
+}
+function ask(q,a){ S.thread.unshift({q,a:a||answer(q)}); renderThread(); }
+function renderThread(){
+  $('#thread').innerHTML=S.thread.map(t=>
+    `<div class="qa"><div class="q">${esc(t.q)}</div><div class="a">${t.a}</div></div>`).join('');
+}
+const SUGGEST=['304 델타페라이트가 왜 이 값인가?','Md30 이 연신율에 미치는 영향은?',
+  '410 의 Ac1 과 소둔온도 관계','430 예민화를 막으려면?','성분원가에서 Ni 절감 여지',
+  '결정립과 소둔조건의 관계','4계열 내식성 비교','439 완전 페라이트가 예민화에 강한 이유','페르소나 검증 결과','430 리징 대책','용접 FN 은 괜찮은가'];
+function renderSuggest(){
+  $('#suggest').innerHTML=SUGGEST.map(s=>`<button class="sg" type="button">${s}</button>`).join('');
+}
+$('#suggest').addEventListener('click',e=>{
+  const b=e.target.closest('.sg'); if(!b) return;
+  $('#askInput').value=b.textContent; ask(b.textContent);
+});
+$('#askForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const v=$('#askInput').value.trim(); if(!v) return;
+  ask(v); $('#askInput').value='';
+});
+
+/* ══════════════════════════════════════════════════════════════
+   13. 기동
+   ══════════════════════════════════════════════════════════════ */
+initState(); render(); renderPrices(); renderSuggest();
+ask('4개 계열 기준 설계 현황은?');
+</script>
