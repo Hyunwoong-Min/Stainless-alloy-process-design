@@ -1,14 +1,14 @@
 /* ══════════════════════════════════════════════════════════════
    4. 상태
    ══════════════════════════════════════════════════════════════ */
-const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},tab:ORDER[0]};
+const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},inDiff:{},tab:ORDER[0]};
 function initState(){
   ORDER.forEach(k=>{
     S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},
               touched:{},solved:{},pend:{}};
     S.log[k]=[];
   });
-  S.thread=[]; S.chg={}; S.diff={};
+  S.thread=[]; S.chg={}; S.diff={}; S.inDiff={};
 }
 const calc=k=>compute(k,S.g[k].comp,S.g[k].proc,S.prices);
 function recalc(){ ORDER.forEach(k=>S.res[k]=calc(k)); }
@@ -109,16 +109,43 @@ function knobList(k,mode){
   return PROC_KNOBS.map(e=>{const m=PR.find(x=>x.k===e), w=win[e];
     return {e,lo:w?Math.max(m.min,w[0]):m.min,hi:w?Math.min(m.max,w[1]):m.max,st:m.s,d:m.d};});
 }
-/* 목적물성 prop 을 target 으로 — mode: 'comp' | 'proc' */
+/* 목적물성 prop 을 target 으로 — mode: 'comp' | 'proc'
+   1단계: 단위 원가당 효율이 높은 노브부터 이분법으로 접근 (최소원가 우선)
+   2단계: 그래도 목표 미달이면 좌표하강으로 도달 가능한 한계치까지 밀어붙이고,
+          그 한계치와 한계를 만든 제약을 함께 보고한다 */
 function solve(k,prop,target,mode){
   const R0=S.res[k], base=R0[prop];
-  const steps=[], knobs=knobList(k,mode);
-  const cur=()=>mode==='comp'?{...S.g[k].comp}:{...S.g[k].proc};
+  const steps=[], knobs=knobList(k,mode), rejected=[];
+  const want=Math.sign(target-base);                  // +1 이면 올려야 함
+  const tol=Math.abs(target)*0.004;
+  const getv=e=>(mode==='comp'?S.g[k].comp:S.g[k].proc)[e];
+  const setv=(e,v)=>{ (mode==='comp'?S.g[k].comp:S.g[k].proc)[e]=v; };
+
+  // 새 'no' 등급 제약이 생기지 않는 변경만 채택
+  const tryMove=(e,v)=>{
+    const before=S.res[k], v0=getv(e);
+    if(Math.abs(v-v0)<1e-12) return null;
+    const Rn=trial(k,mode,e,v);
+    setv(e,v); S.res[k]=Rn;
+    const c0=constraints(k,before).filter(x=>x.lv==='no').map(x=>x.id);
+    const born=constraints(k,Rn).filter(x=>x.lv==='no'&&!c0.includes(x.id));
+    if(born.length){ setv(e,v0); S.res[k]=before; return {ok:false,born}; }
+    return {ok:true,before,Rn,v0};
+  };
+  const record=(kb,v0,to,before,Rn)=>{
+    const ex=steps.find(s=>s.knob===kb.e);
+    if(ex){ ex.to=to; ex.dP=Rn[prop]-ex.beforeP; ex.dC=Rn.cost.total-ex.beforeC; }
+    else steps.push({knob:kb.e,mode,from:v0,to,d:kb.d,
+      beforeP:before[prop], beforeC:before.cost.total,
+      dP:Rn[prop]-before[prop], dC:Rn.cost.total-before.cost.total,
+      sens:kb.dP, unit:mode==='comp'?'wt%':(PR.find(x=>x.k===kb.e).u)});
+    S.g[k].solved[kb.e]=1;
+  };
 
   // 6-1 민감도 · 단가탄력도
   const sens=knobs.map(kb=>{
-    const v0=(mode==='comp'?S.g[k].comp:S.g[k].proc)[kb.e];
-    const h=Math.max(kb.st, (kb.hi-kb.lo)/60);
+    const v0=getv(kb.e);
+    const h=Math.max(kb.st,(kb.hi-kb.lo)/60);
     const vp=Math.min(kb.hi,v0+h), vm=Math.max(kb.lo,v0-h);
     if(vp-vm<1e-12) return null;
     const Rp=trial(k,mode,kb.e,vp), Rm=trial(k,mode,kb.e,vm);
@@ -128,48 +155,69 @@ function solve(k,prop,target,mode){
     return {...kb,v0,dP,dC,eff:Math.abs(dP)/(Math.abs(dC)+0.35)};
   }).filter(Boolean).sort((a,b)=>b.eff-a.eff);
 
-  // 6-2 탐욕 적용 : 효율 높은 노브부터 이분법으로 목표 접근
-  let need=target-base, applied=0; const rejected=[];
+  // 6-2 1단계 — 효율 순 이분법
   for(const kb of sens){
-    if(Math.abs(need)<Math.abs(target)*0.004) break;
-    if(applied>=3) break;
-    const dir=Math.sign(need)*Math.sign(kb.dP);
-    let lo=dir>0?kb.v0:kb.lo, hi=dir>0?kb.hi:kb.v0;
-    if(dir<0){ lo=kb.lo; hi=kb.v0; } else { lo=kb.v0; hi=kb.hi; }
+    if(Math.abs(target-S.res[k][prop])<tol) break;
+    const v0=getv(kb.e);
+    const dir=Math.sign(target-S.res[k][prop])*Math.sign(kb.dP);
+    const lo=dir>0?v0:kb.lo, hi=dir>0?kb.hi:v0;
     if(hi-lo<1e-9) continue;
-    const f=v=>trial(k,mode,kb.e,v)[prop]-target;
-    const flo=f(lo), fhi=f(hi);
-    let best;
-    if(flo*fhi<=0){                                   // 구간 내 해 존재
-      let a=lo,b=hi;
-      for(let i=0;i<44;i++){const m=(a+b)/2; (f(a)*f(m)<=0)?b=m:a=m;}
-      best=(a+b)/2;
-    }else{                                            // 한계까지 밀어붙임
-      best=Math.abs(flo)<Math.abs(fhi)?lo:hi;
+    const fn=v=>trial(k,mode,kb.e,v)[prop]-target;
+    const flo=fn(lo), fhi=fn(hi);
+    let bv;
+    if(flo*fhi<=0){ let a=lo,b=hi;
+      for(let i=0;i<44;i++){const m=(a+b)/2; (fn(a)*fn(m)<=0)?b=m:a=m;}
+      bv=(a+b)/2;
+    }else bv=Math.abs(flo)<Math.abs(fhi)?lo:hi;
+    bv=cl(Math.round(bv/kb.st)*kb.st,kb.lo,kb.hi);
+    if(Math.abs(bv-v0)<kb.st*0.5) continue;
+    const r=tryMove(kb.e,bv);
+    if(!r) continue;
+    if(!r.ok){ rejected.push({knob:kb.e,mode,to:bv,d:kb.d,eff:kb.eff,
+                              why:r.born.map(x=>x.txt)}); continue; }
+    record(kb,r.v0,bv,r.before,r.Rn);
+  }
+
+  // 6-3 2단계 — 아직 목표에 못 미치면 좌표하강으로 한계치 탐색
+  let limited=false, binding=[];
+  if(Math.abs(target-S.res[k][prop])>=tol){
+    for(let pass=0; pass<5; pass++){
+      const prev=S.res[k][prop];
+      for(const kb of sens){
+        const v0=getv(kb.e), n=24;
+        let bestV=v0, bestP=S.res[k][prop];
+        for(let i=0;i<=n;i++){
+          const v=cl(Math.round((kb.lo+(kb.hi-kb.lo)*i/n)/kb.st)*kb.st,kb.lo,kb.hi);
+          const pv=trial(k,mode,kb.e,v)[prop];
+          // 목표 방향으로 더 나아가되 목표를 넘지는 않도록
+          const better = want>0 ? (pv>bestP && pv<=target+tol) : (pv<bestP && pv>=target-tol);
+          if(better){ bestP=pv; bestV=v; }
+        }
+        if(Math.abs(bestV-v0)<kb.st*0.5) continue;
+        const r=tryMove(kb.e,bestV);
+        if(!r) continue;
+        if(!r.ok){ if(!rejected.some(x=>x.knob===kb.e))
+            rejected.push({knob:kb.e,mode,to:bestV,d:kb.d,eff:kb.eff,
+                           why:r.born.map(x=>x.txt)});
+          continue; }
+        record(kb,r.v0,bestV,r.before,r.Rn);
+      }
+      if(Math.abs(S.res[k][prop]-prev)<Math.abs(target)*0.0005) break;
     }
-    best=cl(Math.round(best/kb.st)*kb.st,kb.lo,kb.hi);
-    if(Math.abs(best-kb.v0)<kb.st*0.5) continue;
-    const before=S.res[k], Rn=trial(k,mode,kb.e,best);
-    // 제약 악화 시 채택 보류
-    if(mode==='comp'){ S.g[k].comp[kb.e]=best; } else { S.g[k].proc[kb.e]=best; }
-    S.res[k]=Rn;
-    const c0=constraints(k,before).filter(x=>x.lv==='no').map(x=>x.id);
-    const cN=constraints(k,Rn).filter(x=>x.lv==='no');
-    const born=cN.filter(x=>!c0.includes(x.id));
-    if(born.length){
-      if(mode==='comp') S.g[k].comp[kb.e]=kb.v0; else S.g[k].proc[kb.e]=kb.v0;
-      S.res[k]=before;
-      rejected.push({knob:kb.e,mode,to:best,d:kb.d,eff:kb.eff,why:born.map(x=>x.txt)});
-      continue;
+    if(Math.abs(target-S.res[k][prop])>=tol){
+      limited=true;
+      // 한계를 만든 요인 — 규격/조업창 끝에 닿은 노브
+      binding=sens.filter(kb=>{
+        const v=getv(kb.e);
+        return Math.abs(v-kb.lo)<kb.st*0.6 || Math.abs(v-kb.hi)<kb.st*0.6;
+      }).slice(0,5).map(kb=>({e:kb.e,at:Math.abs(getv(kb.e)-kb.lo)<kb.st*0.6?'하한':'상한',
+                              lo:kb.lo,hi:kb.hi,d:kb.d}));
     }
-    steps.push({knob:kb.e,mode,from:kb.v0,to:best,d:kb.d,
-      dP:Rn[prop]-before[prop], dC:Rn.cost.total-before.cost.total,
-      sens:kb.dP, unit:mode==='comp'?'wt%':(PR.find(x=>x.k===kb.e).u)});
-    S.g[k].solved[kb.e]=1;
-    need=target-Rn[prop]; applied++;
   }
   recalc();
-  return {steps,rejected,achieved:S.res[k][prop],target,base,sens:sens.slice(0,6),prop,mode};
+  return {steps,rejected,limited,binding,
+          achieved:S.res[k][prop],ceiling:S.res[k][prop],
+          target,base,sens:sens.slice(0,6),prop,mode};
 }
 
 /* ── Ni 절감 최적화 (GREEN) ─────────────────────────────────── */
@@ -235,3 +283,15 @@ function diffOut(A,B){
   return d;
 }
 const dcls=(k,key)=>{ const d=S.diff[k]; return d&&d[key]?' chg-'+d[key]:''; };
+
+/* 입력 항목(성분·공정)의 변경 방향 — 바뀐 칸에 색을 입히기 위한 표식 */
+function markInputs(k,beforeComp,beforeProc){
+  const m={};
+  EL.forEach(x=>{ const a=beforeComp[x.k], b=S.g[k].comp[x.k];
+    if(Math.abs(b-a)>=Math.pow(10,-x.d)/2) m['comp:'+x.k]=b>a?'up':'dn'; });
+  PR.forEach(x=>{ const a=beforeProc[x.k], b=S.g[k].proc[x.k];
+    if(Math.abs(b-a)>=Math.pow(10,-x.d)/2) m['proc:'+x.k]=b>a?'up':'dn'; });
+  S.inDiff[k]=m;
+  return m;
+}
+const idcls=(k,kind,key)=>{ const d=S.inDiff[k]; return d&&d[kind+':'+key]?' chg-'+d[kind+':'+key]:''; };

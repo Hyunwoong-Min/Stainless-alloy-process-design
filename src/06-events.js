@@ -73,17 +73,30 @@ function bindBays(){ if(bound) return; bound=true;
     const mode=b.dataset.solve, {k,pk,tgt}=pending;
     if(mode==='cancel'){ pending=null; render(); return; }
     const bIn=S.res[k];
+    const bC={...S.g[k].comp}, bP={...S.g[k].proc};
     const r=solve(k,pk,tgt,mode);
-    S.diff[k]=diffOut(bIn,S.res[k]);
+    S.diff[k]=diffOut(bIn,S.res[k]); markInputs(k,bC,bP);
     logInverse(k,r);
-    snap(k,PROP.find(x=>x.k===pk).n,r.base,r.achieved,PROP.find(x=>x.k===pk).d,
-         PROP.find(x=>x.k===pk).u, mode==="comp"?"역설계 · 성분 조정":"역설계 · 제조조건 조정",
+    const pm=PROP.find(x=>x.k===pk);
+    const miss=Math.abs(r.achieved-r.target)>=Math.abs(r.target)*0.01;
+    const bindTxt=(r.binding||[]).map(b=>
+      `${mode==='comp'?b.e:PR.find(x=>x.k===b.e).n} ${b.at}`).join(', ');
+    snap(k,pm.n,r.base,r.achieved,pm.d,pm.u,
+         mode==='comp'?'역설계 · 성분 조정':'역설계 · 제조조건 조정',
          bIn,S.res[k],
-         r.steps.length
-           ? (mode==="comp"?"성분 ":"제조조건 ")+r.steps.map(s=>s.mode==="comp"?s.knob:PR.find(x=>x.k===s.knob).n).join(", ")
-             +" 을(를) 단위 원가당 물성 변화량이 큰 순으로 조정했습니다."
-             +(Math.abs(r.achieved-r.target)<Math.abs(r.target)*0.01?"":" 규격·조업창 한계로 목표에는 도달하지 못했습니다.")
-           : "규격·조업창 내에 해가 없어 변경하지 않았습니다.");
+         (r.steps.length
+           ? (mode==='comp'?'성분 ':'제조조건 ')
+             +r.steps.map(s=>s.mode==='comp'?s.knob:PR.find(x=>x.k===s.knob).n).join(', ')
+             +' 을(를) 단위 원가당 물성 변화량이 큰 순으로 조정했습니다.'
+           : '규격·조업창 내에 해가 없어 변경하지 않았습니다.')
+         +(miss
+           ? ` 규격·조업창 안에서 도달 가능한 한계는 ${f(r.achieved,pm.d)} ${pm.u} 입니다.`
+             +(bindTxt?` ${bindTxt} 이(가) 한계에 닿았습니다.`:'')
+             +(mode==='comp'?' 제조조건 쪽으로 다시 시도하면 조금 더 움직일 수 있습니다.':'')
+           : ''),
+         null,
+         miss?{target:r.target,reach:r.achieved,unit:pm.u,label:pm.n,
+               mode:mode==='comp'?'성분':'제조조건',bind:bindTxt}:null);
     pending=null; render();
     const bay=document.querySelector(`[data-bay="${k}"]`);
     if(bay) bay.querySelector('details.basis').open=true;
@@ -92,8 +105,8 @@ function bindBays(){ if(bound) return; bound=true;
 
 
 /* ── 변경 스냅샷 : 요약 패널의 원본 데이터 ─────────────────── */
-function snap(k,what,from,to,dec,unit,mode,A,B,note,items){
-  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note,items:items||null};
+function snap(k,what,from,to,dec,unit,mode,A,B,note,items,miss){
+  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note,items:items||null,miss:miss||null};
 }
 function noteFor(k,kind,key,A,B){
   const R=B;
@@ -195,9 +208,10 @@ function refreshOut(){
    ══════════════════════════════════════════════════════════════ */
 $('#btnReset').onclick=()=>{ initState(); render(); renderSuggest(); renderThread(); };
 $('#btnFix').onclick=()=>{
-  const A0={}; ORDER.forEach(g=>A0[g]=S.res[g]);
+  const A0={}, C0={}, P0={};
+  ORDER.forEach(g=>{A0[g]=S.res[g]; C0[g]={...S.g[g].comp}; P0[g]={...S.g[g].proc};});
   const ap=autoFix();
-  ORDER.forEach(g=>S.diff[g]=diffOut(A0[g],S.res[g]));
+  ORDER.forEach(g=>{S.diff[g]=diffOut(A0[g],S.res[g]); markInputs(g,C0[g],P0[g]);});
   S.tab=REVIEW_TAB; render();
   const rv=review();
   ask(rv.pass
@@ -214,8 +228,9 @@ $('#btnNi').onclick=()=>{
     const nc=niCut(k); if(!nc) return;
     Object.keys(nc.c).forEach(e=>{ if(Math.abs(nc.c[e]-S.g[k].comp[e])>1e-9) S.g[k].solved[e]=1; });
     const before=S.res[k]; const prevNi=S.g[k].comp.Ni;
+    const bC2={...S.g[k].comp}, bP2={...S.g[k].proc};
     S.g[k].comp={...nc.c}; recalc();
-    S.diff[k]=diffOut(before,S.res[k]);
+    S.diff[k]=diffOut(before,S.res[k]); markInputs(k,bC2,bP2);
     const A=S.res[k];
     S.log[k].push(`<b>Ni 절감 최적화</b> <span class="up">원가 −${f(nc.save,0)} $/t</span><br>
       <span class="d">Ni ${f(before.cost.brk.Ni/10/S.prices.Ni,2)} → ${f(S.g[k].comp.Ni,2)} wt%,
@@ -270,6 +285,7 @@ function applyPending(k){
   recalc();
   const B=S.res[k];
   S.diff[k]=diffOut(A,B);                   // 변한 값에 색을 입히기 위한 표식
+  S.inDiff[k]={}; items.forEach(p=>{ S.inDiff[k][p.kind+":"+p.key]=p.to>p.from?"up":"dn"; });
   logApply(k,items,A,B);
   const one=items.length===1?items[0]:null;
   const list=items.map(p=>({label:p.label,from:p.from,to:p.to,d:p.d,unit:p.unit}));

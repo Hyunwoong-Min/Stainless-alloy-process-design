@@ -208,6 +208,17 @@ table.sum-tb .dn{color:var(--fail);font-weight:600}
 .sum-v{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
 .sum-items{margin:0 0 11px;padding-left:19px;font-size:12.5px;line-height:1.7;color:var(--ink-2)}
 .sum-items b{font-family:var(--disp);color:var(--ink);font-weight:600}
+.sum-miss{border:1px solid var(--warn);background:var(--warn-soft);border-radius:6px;
+  padding:9px 12px;margin-bottom:12px;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+.sum-miss b{font-family:var(--disp);color:var(--warn);letter-spacing:.03em;margin-right:6px}
+.sum-miss .num{color:var(--ink);font-weight:600}
+/* 역설계·최적화로 바뀐 입력 칸 */
+.f input.chg-up,.f input.chg-dn{font-weight:600}
+.f input.chg-up{border-color:var(--pass);background:var(--pass-soft);
+  box-shadow:inset 3px 0 0 var(--pass)}
+.f input.chg-dn{border-color:var(--fail);background:var(--fail-soft);
+  box-shadow:inset 3px 0 0 var(--fail)}
+.f input.pending{box-shadow:inset 3px 0 0 var(--edit)}
 .sum-note{margin:10px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-2);max-width:78ch}
 
 /* ── review board ─────────────────────────── */

@@ -166,6 +166,11 @@ function summaryHTML(k){
       ${c.items?"":`<span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}`}</span>
       <span class="sum-mode">${c.mode}</span></div>
     ${c.items?`<ul class="sum-items">${c.items.map(x=>`<li><b>${esc(x.label)}</b> <span class="num">${f(x.from,x.d)}</span> → <span class="num">${f(x.to,x.d)}</span> ${esc(x.unit)}</li>`).join("")}</ul>`:""}
+    ${c.miss?`<div class="sum-miss"><b>목표 미달</b>
+      ${esc(c.miss.label)} 목표 <span class="num">${f(c.miss.target,c.d)}</span> ${esc(c.miss.unit)} 는
+      ${esc(c.miss.mode)} 조정만으로 도달할 수 없습니다. 규격·조업창 안에서 가능한 한계가
+      <span class="num">${f(c.miss.reach,c.d)}</span> ${esc(c.miss.unit)} 입니다.
+      ${c.miss.bind?`<br>한계에 닿은 항목: ${esc(c.miss.bind)}`:''}</div>`:''}
     <div class="sum-grid">
       <div><div class="sum-t">야금 경로</div>
         ${mid.length?`<ul class="sum-mid">${mid.join('')}</ul>`
@@ -184,7 +189,7 @@ function fieldHTML(k,kind,m){
   const pk=kind+':'+m.k, isPend=!!st.pend[pk];
   const v=isPend?st.pend[pk].to:committed;
   const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':'',
-             isPend?'pending':''].filter(Boolean).join(' ');
+             isPend?"pending":""].filter(Boolean).join(" ")+idcls(k,kind,m.k);
   const spec=kind==='comp'?GRADES[k].spec[m.k]:null;
   const oos=spec&&(v<spec[0]-1e-9||(spec[1]!==null&&v>spec[1]+1e-9))?' oos':'';
   const hint=spec?`${spec[0]}–${spec[1]===null?'—':spec[1]}`:(m.u||'');
