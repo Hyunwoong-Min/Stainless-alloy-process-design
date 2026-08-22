@@ -2406,10 +2406,25 @@ FN ≈ 3.34·Creq − 2.46·Nieq − 28.6</pre>
      ['결정립 µm',...ks.map(k=>f(S.res[k].d,1))],
      ['총원가 $/t',...ks.map(k=>`<b>${f(S.res[k].cost.total,0)}</b>`)],
      ['$/t per MPa YS',...ks.map(k=>f(S.res[k].cost.total/S.res[k].YS,2))]])}
-   <p>304 는 원가의 ${f(S.res['304'].cost.brk.Ni/S.res['304'].cost.total*100,0)} % 가 Ni 입니다.
-   430 은 304 대비 원가가 ${f((1-S.res['430'].cost.total/S.res['304'].cost.total)*100,0)} % 낮지만
-   Epit 이 ${f(S.res['304'].Ep-S.res['430'].Ep,0)} mV 열위이고 EL 이 ${f(S.res['304'].EL-S.res['430'].EL,1)} %p 낮습니다.
-   염화물 환경이 아니고 심가공이 아니라면 430 이 합리적 대체입니다.</p>`;}}
+   ${(()=>{
+     // 계열이 늘거나 바뀌어도 낡지 않도록, 비교 문구를 계산 결과에서 만든다
+     const hi=ks.slice().sort((a,b)=>S.res[b].cost.total-S.res[a].cost.total)[0];
+     const lo=ks.slice().sort((a,b)=>S.res[a].cost.total-S.res[b].cost.total)[0];
+     const H=S.res[hi], L=S.res[lo];
+     const niShare=f(H.cost.brk.Ni/H.cost.total*100,0);
+     const best=ks.slice().sort((a,b)=>S.res[b].Ep-S.res[a].Ep)[0];
+     const cheapPerYS=ks.slice().sort((a,b)=>
+       (S.res[a].cost.total/S.res[a].YS)-(S.res[b].cost.total/S.res[b].YS))[0];
+     return `<p>가장 비싼 계열은 <b>${GRADES[hi].famKo}</b>(${f(H.cost.total,0)} USD/t)로,
+       원가의 ${niShare} % 가 Ni 입니다. 가장 싼 <b>${GRADES[lo].famKo}</b>(${f(L.cost.total,0)})
+       대비 ${f((H.cost.total/L.cost.total-1)*100,0)} % 높습니다.</p>
+     <p>다만 ${GRADES[lo].famKo} 는 공식전위가 ${f(H.Ep-L.Ep,0)} mV,
+       연신율이 ${f(H.EL-L.EL,1)} %p 열위입니다. 염화물 환경이 아니고 심가공이 아니라면
+       원가 우위가 그만큼 유효합니다.</p>
+     <p>내식성 최고는 <b>${GRADES[best].famKo}</b>(Epit ${f(S.res[best].Ep,0)} mV, PREN ${f(S.res[best].pren,1)}),
+       강도당 원가가 가장 낮은 쪽은 <b>${GRADES[cheapPerYS].famKo}</b>
+       (${f(S.res[cheapPerYS].cost.total/S.res[cheapPerYS].YS,2)} $/t·MPa) 입니다.</p>`;
+   })()}`;}}
 ];
 function answer(q){
   const k=which(q), ql=q.toLowerCase();
