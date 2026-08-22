@@ -227,33 +227,6 @@ $('#btnFix').onclick=()=>{
     +`<p>${rv.pass?'페르소나 5인 전원이 9.0 이상으로 <b>설계 승인</b> 상태입니다.'
       :'남은 지적사항은 페르소나 보드의 ▲ 표시 항목입니다.'}</p>`);
 };
-$('#btnNi').onclick=()=>{
-  const res=[];
-  ORDER.forEach(k=>{
-    const nc=niCut(k); if(!nc) return;
-    Object.keys(nc.c).forEach(e=>{ if(Math.abs(nc.c[e]-S.g[k].comp[e])>1e-9) S.g[k].solved[e]=1; });
-    const before=S.res[k]; const prevNi=S.g[k].comp.Ni;
-    const bC2={...S.g[k].comp}, bP2={...S.g[k].proc};
-    S.g[k].comp={...nc.c}; recalc();
-    S.diff[k]=diffOut(before,S.res[k]); markInputs(k,bC2,bP2);
-    const A=S.res[k];
-    S.log[k].push(`<b>Ni 절감 최적화</b> <span class="up">원가 −${f(nc.save,0)} $/t</span><br>
-      <span class="d">Ni ${f(before.cost.brk.Ni/10/S.prices.Ni,2)} → ${f(S.g[k].comp.Ni,2)} wt%,
-      N +${f(nc.dN,3)}, Cu +${f(nc.dCu,2)}, Mn +${f(nc.dMn,2)}<br>
-      제약 유지: Md30 ${f(before.md30,0)}→${f(A.md30,0)} ℃ (±12 이내), PREN ${f(before.pren,1)}→${f(A.pren,1)},
-      δ@1300 ${f(A.dCast,1)} %, FN ${f(A.FN,1)}, YS ${f(A.YS,0)} / TS ${f(A.TS,0)} / EL ${f(A.EL,1)} 모두 A240 충족<br>
-      근거: Nieq = Ni+22C+14.2N+0.31Mn+Cu 에서 N은 Ni의 14.2배, Cu는 1배 오스테나이트 안정화 효과를 내지만
-      단가는 N $${S.prices.N}/kg · Cu $${S.prices.Cu}/kg 대 Ni $${S.prices.Ni}/kg 이므로 등가 안정화당 비용이 낮음</span>`);
-    snap(k,"Ni",prevNi,S.g[k].comp.Ni,2,"wt%","최소원가 최적화 · 성분 치환",before,A,
-      "Nieq = Ni+22C+14.2N+0.31Mn+Cu 에서 N 의 계수는 14.2, Cu 는 1.0 입니다. 즉 N 1 kg 이 Ni 14.2 kg 의 오스테나이트 안정화 효과를 내면서 단가는 훨씬 낮으므로, Md30 등가를 유지한 채 Ni 를 덜어낼 수 있습니다.");
-    res.push(`${GRADES[k].label}: Ni −${nc.dNi.toFixed(2)} wt% → −${nc.save.toFixed(0)} USD/t`);
-  });
-  render();
-  ask('Ni 절감 최적화',res.length
-    ?`<p>Md30 ±12 ℃, PREN, δ@1300 ℃, 용접 FN, A240 기계적 규격을 모두 유지하는 조건에서
-       N·Cu·Mn 으로 Ni 를 치환했습니다.</p><ul>${res.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>`
-    :'<p>현재 설계에서 제약을 유지하며 추가로 절감 가능한 Ni 여유가 없습니다. 이미 최소 원가 근방입니다.</p>');
-};
 $('#btnPrices').onclick=()=>{
   const box=$('#priceBox');
   box.hidden=!box.hidden;

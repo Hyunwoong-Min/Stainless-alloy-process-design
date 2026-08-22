@@ -399,35 +399,6 @@ function solve(k,prop,target,mode){
           target,base,sens:sens.slice(0,6),prop,mode};
 }
 
-/* ── Ni 절감 최적화 (GREEN) ─────────────────────────────────── */
-function niCut(k){
-  const R=S.res[k]; if(R.fam!=='austenitic') return null;
-  const c0={...S.g[k].comp}, cost0=R.cost.total, md0=R.md30, pr0=R.pren;
-  let best=null;
-  for(let dNi=0.05;dNi<=1.20;dNi+=0.05){
-    const Ni=c0.Ni-dNi; if(Ni<GRADES[k].knobs.Ni[0]) break;
-    for(let dN=0;dN<=0.045;dN+=0.005){
-      const N=Math.min(GRADES[k].knobs.N[1],c0.N+dN);
-      for(let dCu=0;dCu<=0.70;dCu+=0.05){
-        const Cu=Math.min(GRADES[k].knobs.Cu[1],c0.Cu+dCu);
-        for(let dMn=0;dMn<=0.80;dMn+=0.10){
-          const Mn=Math.min(GRADES[k].knobs.Mn[1],c0.Mn+dMn);
-          const c={...c0,Ni:+Ni.toFixed(3),N:+N.toFixed(3),Cu:+Cu.toFixed(3),Mn:+Mn.toFixed(3)};
-          const R2=compute(k,c,S.g[k].proc,S.prices);
-          if(Math.abs(R2.md30-md0)>12) continue;
-          if(R2.pren<pr0-0.25) continue;
-          if(R2.dCast<2||R2.dCast>10) continue;
-          if(R2.FN<3||R2.FN>12) continue;
-          if(R2.YS<GRADES[k].mech.YS[0]||R2.TS<GRADES[k].mech.TS[0]||R2.EL<GRADES[k].mech.EL[0]) continue;
-          if(R2.HV>GRADES[k].mech.HV[1]) continue;
-          const save=cost0-R2.cost.total;
-          if(!best||save>best.save) best={c,R:R2,save,dNi,dN:N-c0.N,dCu:Cu-c0.Cu,dMn:Mn-c0.Mn};
-        }
-      }
-    }
-  }
-  return best&&best.save>8?best:null;
-}
 
 /* ══════════════════════════════════════════════════════════════
    6-b. 대기 중인 수정 (여러 항목을 모아 한 번에 반영)

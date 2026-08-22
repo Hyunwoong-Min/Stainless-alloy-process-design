@@ -34,9 +34,6 @@ function review(){
       push('green',`${L} 원가 ${R.cost.total.toFixed(0)} USD/t — 기준 대비 ${(dv*100).toFixed(1)} %`,0);
     }
     if(R.fam==='austenitic'){
-      const nc=niCut(k);
-      if(nc) push('green',`${L} Ni ${nc.dNi.toFixed(2)} % 절감 여지 — Md30 등가 유지하며 ${nc.save.toFixed(0)} USD/t 절감 가능`,
-                  Math.min(1.5,nc.save/60),{k,t:'niCut'});
       const ni=R.cost.brk.Ni/R.cost.alloy*100;
       push('green',`${L} 합금비 중 Ni 비중 ${ni.toFixed(0)} %, Cr ${(R.cost.brk.Cr/R.cost.alloy*100).toFixed(0)} %`,0);
     }
@@ -104,13 +101,7 @@ function autoFix(){
     if(!fixes.length) break;
     const f=fixes[0]; if(!f||!f.k) break;
     const k=f.k;
-    if(f.t==='niCut'){
-      const nc=niCut(k);
-      if(!nc) break;
-      Object.keys(nc.c).forEach(e=>{ if(nc.c[e]!==S.g[k].comp[e]) S.g[k].solved[e]=1; });
-      S.g[k].comp={...nc.c};
-      applied.push(`${GRADES[k].label} Ni −${nc.dNi.toFixed(2)} % (N+${nc.dN.toFixed(3)}, Cu+${nc.dCu.toFixed(2)}, Mn+${nc.dMn.toFixed(2)}) → −${nc.save.toFixed(0)} USD/t`);
-    }else if(f.t==='comp'){
+    if(f.t==='comp'){
       const kn=GRADES[k].knobs[f.e]||[EL.find(x=>x.k===f.e).min,EL.find(x=>x.k===f.e).max];
       const spec=GRADES[k].spec[f.e];
       let lo=kn[0],hi=kn[1];

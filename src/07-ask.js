@@ -176,22 +176,20 @@ Q = ${GG[R.fam==='austenitic'?'austenitic':'ferritic'].Q/1000} kJ/mol,  Z(Zener 
    const rows=ks.map(g=>{const R=S.res[g],C=R.cost;
      return [GRADES[g].label,f(C.brk.Ni,0),f(C.brk.Cr,0),f(C.brk.Fe,0),f(C.refine,0),f(C.conv,0),`<b>${f(C.total,0)}</b>`,
        sgn((C.total-GRADES[g].refCost)/GRADES[g].refCost*100,1)+' %'];});
-   const k0=ks[0], nc=niCut(k0);
+   const k0=ks[0];
    return `<p>USD / 톤 냉연 코일 기준 원가 구조입니다.</p>
    ${tbl(['강종','Ni','Cr','Fe','정련','가공','합계','벤치마크 대비'],rows)}
-   <p>304 의 원가는 <b>Ni 단가에 거의 선형으로 종속</b>됩니다. Ni 1 % 는
+   <p>오스테나이트계 원가는 <b>Ni 단가에 거의 선형으로 종속</b>됩니다. Ni 1 % 는
    10 kg/t × $${S.prices.Ni}/kg = <b>$${f(10*S.prices.Ni,0)}/t</b> 이며, 이는 Cr 1 %(${f(10*S.prices.Cr,0)})의 ${f(S.prices.Ni/S.prices.Cr,1)}배입니다.</p>
    <p>정련 페널티는 규격 하한을 과도하게 밑돌 때 발생하는 실비입니다:
    <code>S: 45·log₁₀(0.010/S)</code>, <code>P: 30·log₁₀(0.030/P)</code>,
    <code>C&lt;0.03: 1500·(0.03−C)</code>, <code>N&lt;0.02: 900·(0.02−N)</code>.
    현재 ${GRADES[k0].label} 의 정련비 <b>$${f(S.res[k0].cost.refine,0)}/t</b> 중 탈황이 $${f(S.res[k0].cost.sPen,0)} 입니다.</p>
-   ${nc?`<p><b>절감 여지</b> — ${GRADES[k0].label} 에서 Ni 를 ${f(nc.dNi,2)} % 줄이고
-     N +${f(nc.dN,3)} · Cu +${f(nc.dCu,2)} · Mn +${f(nc.dMn,2)} 로 치환하면
-     Md30·PREN·δ·FN·A240 기계적 규격을 모두 유지한 채 <b>$${f(nc.save,0)}/t</b> 를 절감합니다.
-     상단 <b>Ni 절감 최적화</b> 버튼으로 적용할 수 있습니다.</p>
-     <p>근거: Nieq 식에서 N 의 계수는 14.2, Cu 는 1.0, Mn 은 0.31 입니다. 즉 N 1 kg 은 Ni 14.2 kg 의 오스테나이트
-     안정화 효과를 내면서 단가는 $${S.prices.N} 대 $${f(14.2*S.prices.Ni,0)} 입니다.</p>`
-    :`<p>현재 설계는 제약조건 하에서 이미 최소원가 근방입니다.</p>`}
+   <p><b>Ni 를 덜어내려면</b> — Nieq = Ni + 22C + 14.2N + 0.31Mn + Cu 에서 N 의 계수가 14.2,
+   Cu 가 1.0 입니다. N 1 kg 이 Ni 14.2 kg 만큼 오스테나이트를 안정시키면서 단가는
+   $${S.prices.N} 대 $${f(14.2*S.prices.Ni,0)} 이므로, Ni 를 줄이고 N·Cu·Mn 으로 치환하면
+   Md30 을 유지한 채 원가를 낮출 수 있습니다. 성분칸에서 직접 조정하거나,
+   원가 항목에 목표값을 넣고 <b>성분 변경</b> 역설계를 돌리면 됩니다.</p>
    <p>가공비는 소둔온도·라인속도에 직접 반응합니다:
    <code>16·(T/900)^1.9 + 850/V</code>. 속도를 올리면 톤당 고정비가 줄지만 결정립이 작아져 강도가 오르므로
    물성 목표와 함께 봐야 합니다.</p>`;}},
@@ -304,7 +302,7 @@ function answer(q){
     <ul><li>델타페라이트 · 응고모드 · 열간연성</li><li>Md30 · 가공유기 마르텐사이트 · TRIP</li>
     <li>γmax · Kaltenhauser 인자 · Ac1/Ac3 변태점</li><li>PREN · 공식전위 · 임계전류밀도</li>
     <li>예민화 · Ti/Nb 안정화</li><li>결정립 · 소둔온도/속도 · Hall–Petch</li>
-    <li>성분원가 · Ni 절감</li><li>리징 · r값 · 성형성</li><li>용접 FN · σ상</li>
+    <li>성분원가 · Ni 치환</li><li>리징 · r값 · 성형성</li><li>용접 FN · σ상</li>
     <li>시장성 · 페르소나 검증 결과</li><li>강종 비교</li><li>방금 왜 바뀌었나</li></ul>
     <p>계열명(Austenite / Martensite / Semi-Ferrite / Fully-Ferrite) 또는 강종번호(304 / 410 / 430 / 439)를 함께 쓰면 그 기준으로 답합니다.</p>`;
   return best.fn(ql,k);
@@ -315,7 +313,7 @@ function renderThread(){
     `<div class="qa"><div class="q">${esc(t.q)}</div><div class="a">${t.a}</div></div>`).join('');
 }
 const SUGGEST=['304 델타페라이트가 왜 이 값인가?','Md30 이 연신율에 미치는 영향은?',
-  '410 의 Ac1 과 소둔온도 관계','430 예민화를 막으려면?','성분원가에서 Ni 절감 여지',
+  '410 의 Ac1 과 소둔온도 관계','430 예민화를 막으려면?','Ni 원가를 줄이려면',
   '결정립과 소둔조건의 관계','4계열 내식성 비교','439 완전 페라이트가 예민화에 강한 이유','페르소나 검증 결과','430 리징 대책','용접 FN 은 괜찮은가'];
 function renderSuggest(){
   $('#suggest').innerHTML=SUGGEST.map(s=>`<button class="sg" type="button">${s}</button>`).join('');
