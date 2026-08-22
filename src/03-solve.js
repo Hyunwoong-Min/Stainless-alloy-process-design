@@ -1,7 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
    4. 상태
    ══════════════════════════════════════════════════════════════ */
-const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},inDiff:{},tab:ORDER[0]};
+const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},inDiff:{},
+         tab:ORDER[0], scope:"dev"};   // scope: "dev" 신강종 개발 | "std" 기본강종 규격 준수
 function initState(){
   ORDER.forEach(k=>{
     S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},
@@ -19,19 +20,35 @@ function recalc(){ ORDER.forEach(k=>S.res[k]=calc(k)); }
 function constraints(k,R){
   const G=GRADES[k], c=S.g[k].comp, p=S.g[k].proc, out=[];
   const add=(id,name,val,txt,lv,fix)=>out.push({id,name,val,txt,lv,fix});
+  const dev=S.scope==='dev';
+  // 신강종 개발 모드에서는 기본강종 규격 이탈이 '불합격'이 아니라 '개발강종' 표식이다.
+  // 다만 야금학적 정합성(스테인리스 성립 요건, 계열 정체성)은 모드와 무관하게 지킨다.
+  const specLv = dev?'wa':'no';
+  const tail = dev?' (개발강종 — 표준 규격 밖)':'';
 
-  // 규격 성분
+  // 기본강종 성분 규격
   Object.entries(G.spec).forEach(([e,[lo,hi]])=>{
     const v=c[e];
-    if(v<lo-1e-9)      add('spec_'+e,`${e} 규격`,v,`${e} ${v} % < A240 하한 ${lo} %`,'no',{t:'comp',e,v:lo});
-    else if(hi!==null&&v>hi+1e-9) add('spec_'+e,`${e} 규격`,v,`${e} ${v} % > A240 상한 ${hi} %`,'no',{t:'comp',e,v:hi});
+    if(v<lo-1e-9)      add('spec_'+e,`${e} 규격`,v,`${e} ${v} % < ${G.label} 하한 ${lo} %`+tail,specLv,{t:'comp',e,v:lo});
+    else if(hi!==null&&v>hi+1e-9) add('spec_'+e,`${e} 규격`,v,`${e} ${v} % > ${G.label} 상한 ${hi} %`+tail,specLv,{t:'comp',e,v:hi});
   });
-  // 기계적 규격
+  // 기본강종 기계적 규격
   Object.entries(G.mech).forEach(([m,[lo,hi]])=>{
     const v=R[m], u=PROP.find(x=>x.k===m).u;
-    if(lo!==null&&v<lo) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} < A240 최소 ${lo}`,'no',{t:'prop',e:m,v:lo*1.04});
-    if(hi!==null&&v>hi) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} > A240 최대 ${hi}`,'no',{t:'prop',e:m,v:hi*0.96});
+    if(lo!==null&&v<lo) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} < ${G.label} 최소 ${lo}`+tail,specLv,{t:'prop',e:m,v:lo*1.04});
+    if(hi!==null&&v>hi) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} > ${G.label} 최대 ${hi}`+tail,specLv,{t:'prop',e:m,v:hi*0.96});
   });
+  // ── 여기부터는 모드와 무관하게 지켜야 하는 야금학적 요건 ──
+  if(R.pren<11) add('pren','PREN',R.pren,`PREN ${R.pren.toFixed(1)} < 11 — 부동태 피막이 성립하지 않아 스테인리스가 아님`,'no',{t:'comp',e:'Cr',v:c.Cr+0.5});
+  if(c.Cr<10.5) add('cr105','최소 Cr',c.Cr,`Cr ${c.Cr} % < 10.5 % — 스테인리스 정의 미달`,'no',{t:'comp',e:'Cr',v:10.6});
+  // 계열 정체성 — 이걸 벗어나면 다른 계열이 되어 모델 자체가 어긋난다
+  if(R.fam==='austenitic'&&R.dCast>25)
+    add('famid','계열 정체성',R.dCast,`δ ${R.dCast.toFixed(0)} % — 오스테나이트계를 벗어나 듀플렉스 영역`,'no',{t:'comp',e:'Ni',v:c.Ni+1.0});
+  if(R.fam==='ferritic'&&R.gmax>85)
+    add('famid','계열 정체성',R.gmax,`γmax ${R.gmax.toFixed(0)} % — 페라이트계를 벗어나 마르텐사이트계 거동`,'no',{t:'comp',e:'Cr',v:c.Cr+1.0});
+  if(R.fam==='martensitic'&&R.gmax<50)
+    add('famid','계열 정체성',R.gmax,`γmax ${R.gmax.toFixed(0)} % — 경화가 불가해 마르텐사이트계로 성립하지 않음`,'no',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.05)});
+
   // 열간연성 — δ/γ 이상역을 갖는 계열에만 적용
   if(R.fam!=='ferritic'){
     if(R.dCast<2)      add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % < 2 % — 완전 오스테나이트 응고, 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.35});
@@ -39,7 +56,7 @@ function constraints(k,R){
   }
   if(R.fam==='austenitic'){
     if(R.md30>40)  add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ > 40 — 성형 중 α′ 과다, 시효균열·자성 발현`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.30});
-    if(R.md30<-40) add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ < −40 — TRIP 소실로 연신·인장 저하`,'wa',{t:'comp',e:'Ni',v:c.Ni-0.30});
+    if(R.md30<-80) add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ < −80 — TRIP 소실, 안정형 오스테나이트`,'wa',{t:'comp',e:'Ni',v:c.Ni-0.30});
     if(R.FN<3)     add('fn','용접 FN',R.FN,`FN ${R.FN.toFixed(1)} < 3 — 용접 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.3});
     if(R.FN>12)    add('fn','용접 FN',R.FN,`FN ${R.FN.toFixed(1)} > 12 — 용접부 취화·σ상 석출 위험`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.3});
     if(R.dFin>1.0) add('dfin','잔류 δ',R.dFin,`최종 δ ${R.dFin.toFixed(2)} % > 1 % — 성형성·표면품질 저하`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT-25});
@@ -50,11 +67,10 @@ function constraints(k,R){
     if(R.rbar<0.95)add('rbar','r값',R.rbar,`r̄ ${R.rbar.toFixed(2)} < 0.95 — 심가공 부적합`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+15});
   }
   if(R.fam==='martensitic'){
-    if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.145,c.C+0.015)});
-    if(R.msMar<150)add('ms','Ms',R.msMar,`Ms ${R.msMar.toFixed(0)} ℃ < 150 — 잔류 오스테나이트 과다`,'wa',{t:'comp',e:'C',v:Math.max(0.085,c.C-0.012)});
+    if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.015)});
+    if(R.msMar<150)add('ms','Ms',R.msMar,`Ms ${R.msMar.toFixed(0)} ℃ < 150 — 잔류 오스테나이트 과다`,'wa',{t:'comp',e:'C',v:Math.max(0.03,c.C-0.012)});
   }
   // 공통
-  // 완전 안정화에 필요한 Ti = TiN 소모분(3.42·N) + 잔여 C 고정분(4·Ceff) + 여유
   const tiNeed=3.42*c.N+4*Math.max(0,c.C-c.Nb/7.75)+0.02;
   if(R.DOS>30)  add('dos','예민화',R.DOS,
                     `DOS ${R.DOS.toFixed(0)} / 100 — 입계 Cr 결핍, 내식성 저하`
@@ -63,7 +79,6 @@ function constraints(k,R){
                                         :{t:'comp',e:'Ti',v:tiNeed});
   if(R.d>45)    add('grain','결정립',R.d,`d ${R.d.toFixed(0)} µm (ASTM ${R.G.toFixed(1)}) — 오렌지필·강도 저하`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT-25});
   if(R.d<8)     add('grain','결정립',R.d,`d ${R.d.toFixed(1)} µm — 재결정 불완전 가능`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+25});
-  if(R.pren<11) add('pren','PREN',R.pren,`PREN ${R.pren.toFixed(1)} < 11 — 스테인리스 최소 Cr 요건 미달`,'no',{t:'comp',e:'Cr',v:c.Cr+0.5});
   return out;
 }
 
@@ -88,6 +103,12 @@ function operability(k){
   if(R.fam!=='austenitic' && p.hrAnnT>R.ac1)
     add(`열연 소둔 ${p.hrAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ — 소둔 목적(연화)과 반대로 재경화`,
         {t:'proc',e:'hrAnnT',v:Math.round(R.ac1)-40});
+  // 고탄소 마르텐사이트계는 Ac1 을 넘겨 소둔하면 급냉으로 경화된다. 실제 연질
+  // 소둔은 상자소둔의 서냉(~25 ℃/h)이 필요한데 본 모델은 연속소둔만 다룬다.
+  if(R.fam==='martensitic' && R.fm>0.5 && R.HV>300)
+    add(`냉연 소둔 ${p.crAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ 이고 급냉이라 HV ${R.HV.toFixed(0)} 의 경화재가 됩니다. `
+       +`연질 소둔이 목적이면 Ac1 미만으로 낮추십시오. 고탄소재의 상자소둔(서냉)은 이 모델의 적용역 밖입니다.`,
+       {t:'proc',e:'crAnnT',v:Math.round(R.ac1)-30});
   return out;
 }
 
@@ -100,11 +121,16 @@ function trial(k,mode,knob,val){
   return compute(k,c,p,S.prices);
 }
 function knobList(k,mode){
-  const comp=()=>Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>({e,lo,hi,kind:'comp',
-    st:EL.find(x=>x.k===e).s, d:EL.find(x=>x.k===e).d, u:'wt%',
-    n:e}));
-  // 공정 노브는 설비 최대범위가 아니라 강종별 야금학적 조업창(pk) 안에서만 움직인다
-  const proc=()=>{ const win=GRADES[k].pk||{};
+  const dev=S.scope==='dev', fam=GRADES[k].family;
+  const FR=FAM_RANGE[fam], FP=FAM_PK[fam];
+  const comp=()=>Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>{
+    const m=EL.find(x=>x.k===e);
+    // 신강종 개발 모드에서는 기본강종 규격창이 아니라 계열 설계공간을 쓴다
+    const r=dev&&FR[e]?FR[e]:[lo,hi];
+    return {e,lo:Math.max(m.min,r[0]),hi:Math.min(m.max,r[1]),kind:'comp',
+            st:m.s,d:m.d,u:'wt%',n:e};
+  });
+  const proc=()=>{ const win=(dev&&FP)?FP:(GRADES[k].pk||{});
     return PROC_KNOBS.map(e=>{const m=PR.find(x=>x.k===e), w=win[e];
       return {e,lo:w?Math.max(m.min,w[0]):m.min,hi:w?Math.min(m.max,w[1]):m.max,
               kind:'proc',st:m.s,d:m.d,u:m.u,n:m.n};});
@@ -114,6 +140,23 @@ function knobList(k,mode){
   return comp().concat(proc());          // 'both' — 성분과 제조조건을 함께 쓴다
 }
 const MODE_KO={comp:'성분',proc:'제조조건',both:'성분+제조조건'};
+/* 입력칸이 허용할 범위 — 화면과 솔버가 같은 창을 쓰도록 */
+function fieldRange(k,kind,key){
+  const fam=GRADES[k].family;
+  if(kind==='comp'){
+    const m=EL.find(x=>x.k===key);
+    if(S.scope==='dev'){ const r=FAM_RANGE[fam][key]||[m.min,m.max];
+      return [Math.max(m.min,r[0]),Math.min(m.max,r[1])]; }
+    const sp=GRADES[k].spec[key], kn=GRADES[k].knobs[key];
+    const lo=Math.max(m.min, sp?sp[0]:(kn?kn[0]:m.min));
+    const hi=Math.min(m.max, sp&&sp[1]!==null?sp[1]:(kn?kn[1]:m.max));
+    return [lo,hi];
+  }
+  const m=PR.find(x=>x.k===key);
+  const win=S.scope==='dev'?FAM_PK[fam]:(GRADES[k].pk||{});
+  const w=win?win[key]:null;
+  return w?[Math.max(m.min,w[0]),Math.min(m.max,w[1])]:[m.min,m.max];
+}
 /* 목적물성 prop 을 target 으로 — mode: 'comp' | 'proc'
    1단계: 단위 원가당 효율이 높은 노브부터 이분법으로 접근 (최소원가 우선)
    2단계: 그래도 목표 미달이면 좌표하강으로 도달 가능한 한계치까지 밀어붙이고,

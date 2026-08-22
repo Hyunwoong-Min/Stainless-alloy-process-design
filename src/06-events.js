@@ -175,9 +175,13 @@ function refreshOut(){
     const bay=document.querySelector(`[data-bay="${k}"]`); if(!bay) return;
     const R=S.res[k], cons=constraints(k,R), ops=operability(k);
     const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
-    const chips=[specOK?['ok','A240 적합']:['no','A240 부적합'],
+    const near=nearestGrade(R.fam,S.g[k].comp);
+    const offN=Object.entries(GRADES[k].spec).filter(([e,[lo,hi]])=>{const v=S.g[k].comp[e];
+      return v<lo-1e-9||(hi!==null&&v>hi+1e-9);}).length;
+    const chips=[specOK?['ok','기준규격 적합']:['no','기준규격 이탈'],
       cons.filter(x=>x.lv==='wa').length?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상'],
       ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능'],
+      offN?['wa',`개발강종 · 최근접 ${near.g}`]:['ok',`표준 ${GRADES[k].label}`],
       ['ok',`${f(R.cost.total,0)} USD/t`]];
     bay.querySelector('.chips').innerHTML=chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('');
     bay.querySelector('.col.out').innerHTML=
@@ -319,3 +323,34 @@ function logApply(k,items,A,B){
   S.log[k].push(`<b>${esc(head)}</b>${d}<br><span class="d">경로: ${why}`
     +(Math.abs(B.d-A.d)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`);
 }
+
+/* ── 설계 범위 전환 : 기준강종 규격 준수 ↔ 신강종 개발 ─────── */
+function renderScope(){
+  const b=$('#btnScope'); if(!b) return;
+  const dev=S.scope==='dev';
+  b.textContent='설계 범위: '+(dev?'신강종 개발':'기준규격 준수');
+  b.classList.toggle('pri',dev);
+  b.title=dev
+    ? '기준강종 규격을 벗어나 계열 전체 설계공간에서 새 조성을 만들 수 있습니다. 규격 이탈은 개발강종 표식으로만 표시됩니다.'
+    : '기준강종(304/410/430/439) 규격 안에서만 설계합니다. 규격 이탈은 불합격으로 판정됩니다.';
+}
+$('#btnScope').onclick=()=>{
+  S.scope=S.scope==='dev'?'std':'dev';
+  renderScope();
+  // 범위가 좁아지면 현재 값이 창 밖일 수 있으므로 입력창 범위만 다시 그린다
+  render();
+  ask(`설계 범위를 ${S.scope==='dev'?'신강종 개발':'기준규격 준수'} 로 전환`,
+    S.scope==='dev'
+    ? `<p>이제 기준강종 규격을 벗어나 <b>계열 전체 설계공간</b>에서 조성을 잡을 수 있습니다.
+       오스테나이트계는 Cr 16~26 · Ni 6~22 · Mo 0~4 · Mn 0.2~8 · N 0.01~0.35 %,
+       페라이트계는 Cr 10.5~30 · Mo 0~4.5 · Ti/Nb 0~1 %,
+       마르텐사이트계는 C 0.03~0.90 · Cr 11~18 · Ni 0~4 % 범위입니다.</p>
+      <p>기준강종 규격 이탈은 <b>개발강종</b> 표식으로만 표시하고 불합격으로 보지 않습니다.
+       다만 아래 세 가지는 모드와 무관하게 지킵니다 — Cr ≥ 10.5 %, PREN ≥ 11,
+       그리고 계열 정체성(오스테나이트계가 듀플렉스로, 페라이트계가 마르텐사이트계로
+       넘어가지 않을 것). 이걸 넘으면 모델의 적용역 자체를 벗어납니다.</p>
+      <p>설계 조성이 어느 상용강종에 가까운지는 각 계열 상단 칩에 <b>최근접 강종</b>으로 표시됩니다.</p>`
+    : `<p>기준강종 규격 안에서만 설계합니다. 규격을 벗어난 항목은 불합격으로 판정되고
+       역설계 솔버도 규격창 밖으로 나가지 않습니다.</p>`);
+};
+renderScope();

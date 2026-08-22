@@ -431,6 +431,7 @@ details.basis[open]>summary::before{transform:rotate(90deg)}
       <p>Austenite · Martensite · Semi-Ferrite · Fully-Ferrite 4개 계열. 성분 13종과 열연·냉연 공정 13항목을 입력하면 기계적 성질과 내식성을 예측하고, 반대로 물성 목표를 입력하면 성분 또는 제조조건을 역산합니다.</p>
     </div>
     <div class="toolbar">
+      <button class="btn" id="btnScope">설계 범위: 신강종 개발</button>
       <button class="btn" id="btnPrices">원료 단가</button>
       <button class="btn" id="btnNi">Ni 절감 최적화</button>
       <button class="btn pri" id="btnFix">자동 개선</button>
@@ -479,20 +480,22 @@ details.basis[open]>summary::before{transform:rotate(90deg)}
 /* ══════════════════════════════════════════════════════════════
    1. 원소 · 공정 항목 정의
    ══════════════════════════════════════════════════════════════ */
+/* 전역 입력 허용범위 — 스테인리스 전 계열(201~310S, 409~447, 403~440C)을 담는다.
+   계열별 실제 설계공간은 FAM_RANGE 가 다시 좁힌다. */
 const EL = [
-  {k:'C', n:'C',  s:0.005, d:3, min:0.005,max:0.20},
-  {k:'Si',n:'Si', s:0.01,  d:2, min:0.05, max:1.20},
-  {k:'Mn',n:'Mn', s:0.01,  d:2, min:0.10, max:2.20},
-  {k:'P', n:'P',  s:0.001, d:3, min:0.008,max:0.045},
-  {k:'S', n:'S',  s:0.0005,d:4, min:0.0002,max:0.030},
-  {k:'Cr',n:'Cr', s:0.05,  d:2, min:10.0, max:22.0},
-  {k:'Ni',n:'Ni', s:0.05,  d:2, min:0.00, max:12.0},
-  {k:'Mo',n:'Mo', s:0.01,  d:2, min:0.00, max:2.50},
-  {k:'Ti',n:'Ti', s:0.005, d:3, min:0.000,max:0.500},
-  {k:'Nb',n:'Nb', s:0.005, d:3, min:0.000,max:0.700},
-  {k:'Cu',n:'Cu', s:0.01,  d:2, min:0.00, max:1.50},
-  {k:'N', n:'N',  s:0.005, d:3, min:0.005,max:0.150},
-  {k:'Al',n:'Al', s:0.001, d:3, min:0.001,max:0.080}
+  {k:'C', n:'C',  s:0.005, d:3, min:0.003, max:1.20},
+  {k:'Si',n:'Si', s:0.01,  d:2, min:0.05,  max:2.50},
+  {k:'Mn',n:'Mn', s:0.01,  d:2, min:0.10,  max:10.0},
+  {k:'P', n:'P',  s:0.001, d:3, min:0.005, max:0.050},
+  {k:'S', n:'S',  s:0.0005,d:4, min:0.0002,max:0.035},
+  {k:'Cr',n:'Cr', s:0.05,  d:2, min:10.0,  max:30.0},
+  {k:'Ni',n:'Ni', s:0.05,  d:2, min:0.00,  max:24.0},
+  {k:'Mo',n:'Mo', s:0.01,  d:2, min:0.00,  max:5.00},
+  {k:'Ti',n:'Ti', s:0.005, d:3, min:0.000, max:1.20},
+  {k:'Nb',n:'Nb', s:0.005, d:3, min:0.000, max:1.20},
+  {k:'Cu',n:'Cu', s:0.01,  d:2, min:0.00,  max:4.50},
+  {k:'N', n:'N',  s:0.005, d:3, min:0.003, max:0.400},
+  {k:'Al',n:'Al', s:0.001, d:3, min:0.001, max:0.200}
 ];
 const PR = [
   {k:'slab',  n:'Slab 두께', u:'mm',    s:5,   d:0, min:150, max:260, st:'hot'},
@@ -656,6 +659,78 @@ function grow(d0,TC,t,fam,pin){
 }
 // ferrite 중 C 고용도 근사 (wt%)
 const csolF=T=>0.008*Math.exp((T-700)/220);
+
+/* ══════════════════════════════════════════════════════════════
+   1-b. 신강종 설계공간 — 기본 강종 규격을 벗어나 계열 전체를 쓴다
+   ══════════════════════════════════════════════════════════════ */
+/* 각 계열이 상용적으로 존재하는 성분 범위. 여기를 벗어나면 모델의
+   보정 근거(문헌 실측)가 없으므로 상한으로 삼는다. */
+const FAM_RANGE={
+  austenitic:{                                   // 201 ~ 310S ~ 317L 영역
+    C:[0.005,0.12],Si:[0.10,2.00],Mn:[0.20,8.00],P:[0.010,0.045],S:[0.0002,0.030],
+    Cr:[16.0,26.0],Ni:[6.0,22.0],Mo:[0,4.00],Ti:[0,0.70],Nb:[0,1.00],
+    Cu:[0,4.00],N:[0.010,0.350],Al:[0.001,0.100]},
+  ferritic:{                                     // 409 ~ 430 ~ 444 ~ 447 영역
+    C:[0.003,0.12],Si:[0.10,2.00],Mn:[0.10,1.50],P:[0.010,0.040],S:[0.0002,0.030],
+    Cr:[10.5,30.0],Ni:[0,1.50],Mo:[0,4.50],Ti:[0,1.00],Nb:[0,1.00],
+    Cu:[0,1.00],N:[0.003,0.060],Al:[0.001,0.150]},
+  martensitic:{                                  // 403 ~ 410 ~ 420 ~ 431 ~ 440 영역
+    C:[0.030,0.90],Si:[0.10,1.50],Mn:[0.20,1.50],P:[0.010,0.040],S:[0.0002,0.030],
+    Cr:[11.0,18.0],Ni:[0,4.00],Mo:[0,1.50],Ti:[0,0.30],Nb:[0,0.30],
+    Cu:[0,1.00],N:[0.005,0.100],Al:[0.001,0.060]}
+};
+/* 공정 조업창도 계열 단위로 넓힌다 (설비 한계는 PR 의 min/max 가 여전히 상한) */
+const FAM_PK={
+  austenitic:{rhfT:[1180,1300],rdt:[980,1150],fdt:[850,1030],ct:[450,860],hrT:[2.0,8.0],
+    hrAnnT:[1000,1200],hrAnnV:[10,80],crAnnT:[980,1180],crAnnV:[15,150]},
+  ferritic:{rhfT:[1130,1280],rdt:[950,1120],fdt:[770,950],ct:[450,830],hrT:[2.5,8.0],
+    hrAnnT:[780,1010],hrAnnV:[12,85],crAnnT:[760,1030],crAnnV:[18,150]},
+  martensitic:{rhfT:[1140,1290],rdt:[960,1130],fdt:[800,980],ct:[450,830],hrT:[3.0,8.0],
+    hrAnnT:[680,900],hrAnnV:[8,70],crAnnT:[650,1000],crAnnV:[10,120]}
+};
+
+/* 설계 결과가 어느 상용 강종에 가까운지 판정하기 위한 참조표 (대표 조성) */
+const REF_GRADES=[
+  {n:'201',f:'austenitic',C:0.08,Cr:16.5,Ni:4.5,Mo:0,Mn:6.5,N:0.15,Ti:0,Nb:0,Cu:0.5},
+  {n:'301',f:'austenitic',C:0.10,Cr:17.0,Ni:7.0,Mo:0,Mn:1.0,N:0.05,Ti:0,Nb:0,Cu:0.2},
+  {n:'304',f:'austenitic',C:0.05,Cr:18.2,Ni:8.3,Mo:0.2,Mn:1.1,N:0.045,Ti:0,Nb:0,Cu:0.35},
+  {n:'304L',f:'austenitic',C:0.020,Cr:18.3,Ni:8.6,Mo:0.2,Mn:1.1,N:0.045,Ti:0,Nb:0,Cu:0.35},
+  {n:'305',f:'austenitic',C:0.05,Cr:18.0,Ni:11.5,Mo:0.2,Mn:1.0,N:0.03,Ti:0,Nb:0,Cu:0.3},
+  {n:'309S',f:'austenitic',C:0.05,Cr:23.0,Ni:13.5,Mo:0.2,Mn:1.5,N:0.05,Ti:0,Nb:0,Cu:0.3},
+  {n:'310S',f:'austenitic',C:0.05,Cr:25.0,Ni:20.0,Mo:0.2,Mn:1.5,N:0.05,Ti:0,Nb:0,Cu:0.3},
+  {n:'316',f:'austenitic',C:0.05,Cr:17.0,Ni:10.5,Mo:2.1,Mn:1.2,N:0.05,Ti:0,Nb:0,Cu:0.4},
+  {n:'316L',f:'austenitic',C:0.020,Cr:17.2,Ni:10.5,Mo:2.1,Mn:1.2,N:0.05,Ti:0,Nb:0,Cu:0.4},
+  {n:'317L',f:'austenitic',C:0.020,Cr:18.5,Ni:13.0,Mo:3.3,Mn:1.3,N:0.06,Ti:0,Nb:0,Cu:0.4},
+  {n:'321',f:'austenitic',C:0.05,Cr:17.5,Ni:9.5,Mo:0.2,Mn:1.2,N:0.02,Ti:0.35,Nb:0,Cu:0.3},
+  {n:'347',f:'austenitic',C:0.05,Cr:17.5,Ni:10.0,Mo:0.2,Mn:1.2,N:0.03,Ti:0,Nb:0.60,Cu:0.3},
+  {n:'409',f:'ferritic',C:0.015,Cr:11.2,Ni:0.2,Mo:0.02,Mn:0.4,N:0.012,Ti:0.25,Nb:0,Cu:0.1},
+  {n:'430',f:'ferritic',C:0.045,Cr:16.3,Ni:0.2,Mo:0.02,Mn:0.4,N:0.040,Ti:0,Nb:0,Cu:0.08},
+  {n:'434',f:'ferritic',C:0.045,Cr:16.8,Ni:0.2,Mo:1.0,Mn:0.4,N:0.040,Ti:0,Nb:0,Cu:0.1},
+  {n:'436',f:'ferritic',C:0.020,Cr:17.0,Ni:0.2,Mo:1.0,Mn:0.4,N:0.020,Ti:0,Nb:0.45,Cu:0.1},
+  {n:'439',f:'ferritic',C:0.012,Cr:17.4,Ni:0.25,Mo:0.02,Mn:0.3,N:0.012,Ti:0.31,Nb:0,Cu:0.08},
+  {n:'441',f:'ferritic',C:0.012,Cr:17.8,Ni:0.2,Mo:0.02,Mn:0.4,N:0.012,Ti:0.15,Nb:0.40,Cu:0.1},
+  {n:'444',f:'ferritic',C:0.010,Cr:18.5,Ni:0.3,Mo:2.0,Mn:0.4,N:0.012,Ti:0.15,Nb:0.30,Cu:0.1},
+  {n:'447',f:'ferritic',C:0.008,Cr:29.0,Ni:0.3,Mo:3.8,Mn:0.3,N:0.010,Ti:0.10,Nb:0.20,Cu:0.1},
+  {n:'403',f:'martensitic',C:0.10,Cr:12.0,Ni:0.3,Mo:0.03,Mn:0.5,N:0.030,Ti:0,Nb:0,Cu:0.1},
+  {n:'410',f:'martensitic',C:0.12,Cr:12.5,Ni:0.3,Mo:0.03,Mn:0.5,N:0.035,Ti:0,Nb:0,Cu:0.1},
+  {n:'420',f:'martensitic',C:0.30,Cr:13.0,Ni:0.3,Mo:0.03,Mn:0.5,N:0.035,Ti:0,Nb:0,Cu:0.1},
+  {n:'431',f:'martensitic',C:0.15,Cr:16.0,Ni:2.0,Mo:0.1,Mn:0.6,N:0.040,Ti:0,Nb:0,Cu:0.2},
+  {n:'440A',f:'martensitic',C:0.68,Cr:17.0,Ni:0.4,Mo:0.4,Mn:0.6,N:0.040,Ti:0,Nb:0,Cu:0.1},
+  {n:'440C',f:'martensitic',C:1.05,Cr:17.0,Ni:0.4,Mo:0.5,Mn:0.6,N:0.040,Ti:0,Nb:0,Cu:0.1}
+];
+/* 정규화 거리 — 원소별 실무 허용폭으로 나눠 비교 */
+const REF_W={C:0.03,Cr:1.0,Ni:1.0,Mo:0.3,Mn:0.5,N:0.02,Ti:0.10,Nb:0.10,Cu:0.3};
+function nearestGrade(fam,c){
+  const list=REF_GRADES.filter(g=>g.f===fam);
+  let best=null;
+  list.forEach(g=>{
+    let d=0,n=0;
+    Object.keys(REF_W).forEach(e=>{ d+=Math.pow((c[e]-g[e])/REF_W[e],2); n++; });
+    d=Math.sqrt(d/n);
+    if(!best||d<best.d) best={g:g.n,d};
+  });
+  return best;   // d < 1 이면 사실상 그 강종, 1~2 변형, 2 초과면 새 조성
+}
 /* ══════════════════════════════════════════════════════════════
    3. 순방향 모델 : 성분 + 제조조건 → 조직 → 물성 → 원가
    ══════════════════════════════════════════════════════════════ */
@@ -749,15 +824,27 @@ function compute(key, comp, proc, prices){
     R.tsPick=15.4*pt;
     R.trip=3.0*R.V30;
     TS=R.tsPick+R.trip+12;
-    ELg=58-0.008*Math.pow(R.md30-10,2)-0.030*(YS-250)-1.5*dF
+    // 연신율 — Md30 의존성. 2차식은 최적점 근방에서만 유효해서 안정형
+    // 오스테나이트(316L·310S, Md30 ≪ 0)에서 발산한다. 양쪽으로 포화하는
+    // 비대칭 종형으로 바꿔, TRIP 이 없어도 연신이 50 % 대에 머무르게 한다.
+    //   Md30 ≈ +10 : TRIP 최적, 연신 최대
+    //   Md30 ≪ 0   : 안정형 — TRIP 없음, 균일연신만 (하한 52)
+    //   Md30 ≫ +10 : 과준안정형 — α′ 조기 생성으로 변형 국부화 (하한 40)
+    const md=R.md30, PEAK=58;
+    const elMd = md<=10 ? 52+(PEAK-52)*Math.exp(-Math.pow((md-10)/55,2))
+                        : 40+(PEAK-40)*Math.exp(-Math.pow((md-10)/40,2));
+    ELg=elMd-0.020*(YS-250)-0.020*(TS-620)-1.5*dF
         +cl(0.05*(R.d-25),-1.5,2.5)-2.5*Math.max(0,0.6-p.crT);
+    ELg=cl(ELg,8,62);
     HV=0.21*TS+0.09*YS+5;
   }else{
     const freeI=Math.min(Ceff+Neff, subCR?0.002:0.008);
     R.freeI=freeI;
     const ysF=55+3.7*c.Cr+83*c.Si+32*c.Mn+11*c.Mo+690*c.P+5000*freeI
               +18.97*hp+180*Math.min(0.5,c.Nb)
-              +(fam==='martensitic'?-35:0);
+              +(fam==="martensitic"?-53:0)
+              // 아임계 소둔재의 구상화 탄화물 강화 — C 가 높을수록 탄화물 분율이 커진다
+              +((fam==="martensitic"&&subCR)?450*Math.min(0.5,Math.max(0,c.C-0.08)):0);
     const tsF=ysF+175+900*freeI;
     R.rbar=cl(1.00+0.010*(crRed-60)+(p.hrAnnT>800?0.5:0)-6*(c.C+c.N)
               +1.0*Math.min(0.4,c.Nb+c.Ti),0.7,1.95);
@@ -775,6 +862,7 @@ function compute(key, comp, proc, prices){
     HV=0.26*TS+0.05*YS+14;
   }
   R.YS=YS; R.TS=TS; R.EL=Math.max(2,ELg); R.HV=HV;
+  R.elMd = fam==="austenitic" ? ELg : null;
 
   /* ── 3-8 내식성 ─────────────────────────────────────────── */
   const famOff={austenitic:0,ferritic:-50,martensitic:-60}[fam];
@@ -899,7 +987,8 @@ function compute(key, comp, proc, prices){
 /* ══════════════════════════════════════════════════════════════
    4. 상태
    ══════════════════════════════════════════════════════════════ */
-const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},inDiff:{},tab:ORDER[0]};
+const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},inDiff:{},
+         tab:ORDER[0], scope:"dev"};   // scope: "dev" 신강종 개발 | "std" 기본강종 규격 준수
 function initState(){
   ORDER.forEach(k=>{
     S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},
@@ -917,19 +1006,35 @@ function recalc(){ ORDER.forEach(k=>S.res[k]=calc(k)); }
 function constraints(k,R){
   const G=GRADES[k], c=S.g[k].comp, p=S.g[k].proc, out=[];
   const add=(id,name,val,txt,lv,fix)=>out.push({id,name,val,txt,lv,fix});
+  const dev=S.scope==='dev';
+  // 신강종 개발 모드에서는 기본강종 규격 이탈이 '불합격'이 아니라 '개발강종' 표식이다.
+  // 다만 야금학적 정합성(스테인리스 성립 요건, 계열 정체성)은 모드와 무관하게 지킨다.
+  const specLv = dev?'wa':'no';
+  const tail = dev?' (개발강종 — 표준 규격 밖)':'';
 
-  // 규격 성분
+  // 기본강종 성분 규격
   Object.entries(G.spec).forEach(([e,[lo,hi]])=>{
     const v=c[e];
-    if(v<lo-1e-9)      add('spec_'+e,`${e} 규격`,v,`${e} ${v} % < A240 하한 ${lo} %`,'no',{t:'comp',e,v:lo});
-    else if(hi!==null&&v>hi+1e-9) add('spec_'+e,`${e} 규격`,v,`${e} ${v} % > A240 상한 ${hi} %`,'no',{t:'comp',e,v:hi});
+    if(v<lo-1e-9)      add('spec_'+e,`${e} 규격`,v,`${e} ${v} % < ${G.label} 하한 ${lo} %`+tail,specLv,{t:'comp',e,v:lo});
+    else if(hi!==null&&v>hi+1e-9) add('spec_'+e,`${e} 규격`,v,`${e} ${v} % > ${G.label} 상한 ${hi} %`+tail,specLv,{t:'comp',e,v:hi});
   });
-  // 기계적 규격
+  // 기본강종 기계적 규격
   Object.entries(G.mech).forEach(([m,[lo,hi]])=>{
     const v=R[m], u=PROP.find(x=>x.k===m).u;
-    if(lo!==null&&v<lo) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} < A240 최소 ${lo}`,'no',{t:'prop',e:m,v:lo*1.04});
-    if(hi!==null&&v>hi) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} > A240 최대 ${hi}`,'no',{t:'prop',e:m,v:hi*0.96});
+    if(lo!==null&&v<lo) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} < ${G.label} 최소 ${lo}`+tail,specLv,{t:'prop',e:m,v:lo*1.04});
+    if(hi!==null&&v>hi) add('mech_'+m,`${m} 규격`,v,`${m} ${v.toFixed(0)} ${u} > ${G.label} 최대 ${hi}`+tail,specLv,{t:'prop',e:m,v:hi*0.96});
   });
+  // ── 여기부터는 모드와 무관하게 지켜야 하는 야금학적 요건 ──
+  if(R.pren<11) add('pren','PREN',R.pren,`PREN ${R.pren.toFixed(1)} < 11 — 부동태 피막이 성립하지 않아 스테인리스가 아님`,'no',{t:'comp',e:'Cr',v:c.Cr+0.5});
+  if(c.Cr<10.5) add('cr105','최소 Cr',c.Cr,`Cr ${c.Cr} % < 10.5 % — 스테인리스 정의 미달`,'no',{t:'comp',e:'Cr',v:10.6});
+  // 계열 정체성 — 이걸 벗어나면 다른 계열이 되어 모델 자체가 어긋난다
+  if(R.fam==='austenitic'&&R.dCast>25)
+    add('famid','계열 정체성',R.dCast,`δ ${R.dCast.toFixed(0)} % — 오스테나이트계를 벗어나 듀플렉스 영역`,'no',{t:'comp',e:'Ni',v:c.Ni+1.0});
+  if(R.fam==='ferritic'&&R.gmax>85)
+    add('famid','계열 정체성',R.gmax,`γmax ${R.gmax.toFixed(0)} % — 페라이트계를 벗어나 마르텐사이트계 거동`,'no',{t:'comp',e:'Cr',v:c.Cr+1.0});
+  if(R.fam==='martensitic'&&R.gmax<50)
+    add('famid','계열 정체성',R.gmax,`γmax ${R.gmax.toFixed(0)} % — 경화가 불가해 마르텐사이트계로 성립하지 않음`,'no',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.05)});
+
   // 열간연성 — δ/γ 이상역을 갖는 계열에만 적용
   if(R.fam!=='ferritic'){
     if(R.dCast<2)      add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % < 2 % — 완전 오스테나이트 응고, 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.35});
@@ -937,7 +1042,7 @@ function constraints(k,R){
   }
   if(R.fam==='austenitic'){
     if(R.md30>40)  add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ > 40 — 성형 중 α′ 과다, 시효균열·자성 발현`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.30});
-    if(R.md30<-40) add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ < −40 — TRIP 소실로 연신·인장 저하`,'wa',{t:'comp',e:'Ni',v:c.Ni-0.30});
+    if(R.md30<-80) add('md30','Md30',R.md30,`Md30 ${R.md30.toFixed(0)} ℃ < −80 — TRIP 소실, 안정형 오스테나이트`,'wa',{t:'comp',e:'Ni',v:c.Ni-0.30});
     if(R.FN<3)     add('fn','용접 FN',R.FN,`FN ${R.FN.toFixed(1)} < 3 — 용접 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.3});
     if(R.FN>12)    add('fn','용접 FN',R.FN,`FN ${R.FN.toFixed(1)} > 12 — 용접부 취화·σ상 석출 위험`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.3});
     if(R.dFin>1.0) add('dfin','잔류 δ',R.dFin,`최종 δ ${R.dFin.toFixed(2)} % > 1 % — 성형성·표면품질 저하`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT-25});
@@ -948,11 +1053,10 @@ function constraints(k,R){
     if(R.rbar<0.95)add('rbar','r값',R.rbar,`r̄ ${R.rbar.toFixed(2)} < 0.95 — 심가공 부적합`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+15});
   }
   if(R.fam==='martensitic'){
-    if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.145,c.C+0.015)});
-    if(R.msMar<150)add('ms','Ms',R.msMar,`Ms ${R.msMar.toFixed(0)} ℃ < 150 — 잔류 오스테나이트 과다`,'wa',{t:'comp',e:'C',v:Math.max(0.085,c.C-0.012)});
+    if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.015)});
+    if(R.msMar<150)add('ms','Ms',R.msMar,`Ms ${R.msMar.toFixed(0)} ℃ < 150 — 잔류 오스테나이트 과다`,'wa',{t:'comp',e:'C',v:Math.max(0.03,c.C-0.012)});
   }
   // 공통
-  // 완전 안정화에 필요한 Ti = TiN 소모분(3.42·N) + 잔여 C 고정분(4·Ceff) + 여유
   const tiNeed=3.42*c.N+4*Math.max(0,c.C-c.Nb/7.75)+0.02;
   if(R.DOS>30)  add('dos','예민화',R.DOS,
                     `DOS ${R.DOS.toFixed(0)} / 100 — 입계 Cr 결핍, 내식성 저하`
@@ -961,7 +1065,6 @@ function constraints(k,R){
                                         :{t:'comp',e:'Ti',v:tiNeed});
   if(R.d>45)    add('grain','결정립',R.d,`d ${R.d.toFixed(0)} µm (ASTM ${R.G.toFixed(1)}) — 오렌지필·강도 저하`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT-25});
   if(R.d<8)     add('grain','결정립',R.d,`d ${R.d.toFixed(1)} µm — 재결정 불완전 가능`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+25});
-  if(R.pren<11) add('pren','PREN',R.pren,`PREN ${R.pren.toFixed(1)} < 11 — 스테인리스 최소 Cr 요건 미달`,'no',{t:'comp',e:'Cr',v:c.Cr+0.5});
   return out;
 }
 
@@ -986,6 +1089,12 @@ function operability(k){
   if(R.fam!=='austenitic' && p.hrAnnT>R.ac1)
     add(`열연 소둔 ${p.hrAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ — 소둔 목적(연화)과 반대로 재경화`,
         {t:'proc',e:'hrAnnT',v:Math.round(R.ac1)-40});
+  // 고탄소 마르텐사이트계는 Ac1 을 넘겨 소둔하면 급냉으로 경화된다. 실제 연질
+  // 소둔은 상자소둔의 서냉(~25 ℃/h)이 필요한데 본 모델은 연속소둔만 다룬다.
+  if(R.fam==='martensitic' && R.fm>0.5 && R.HV>300)
+    add(`냉연 소둔 ${p.crAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ 이고 급냉이라 HV ${R.HV.toFixed(0)} 의 경화재가 됩니다. `
+       +`연질 소둔이 목적이면 Ac1 미만으로 낮추십시오. 고탄소재의 상자소둔(서냉)은 이 모델의 적용역 밖입니다.`,
+       {t:'proc',e:'crAnnT',v:Math.round(R.ac1)-30});
   return out;
 }
 
@@ -998,11 +1107,16 @@ function trial(k,mode,knob,val){
   return compute(k,c,p,S.prices);
 }
 function knobList(k,mode){
-  const comp=()=>Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>({e,lo,hi,kind:'comp',
-    st:EL.find(x=>x.k===e).s, d:EL.find(x=>x.k===e).d, u:'wt%',
-    n:e}));
-  // 공정 노브는 설비 최대범위가 아니라 강종별 야금학적 조업창(pk) 안에서만 움직인다
-  const proc=()=>{ const win=GRADES[k].pk||{};
+  const dev=S.scope==='dev', fam=GRADES[k].family;
+  const FR=FAM_RANGE[fam], FP=FAM_PK[fam];
+  const comp=()=>Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>{
+    const m=EL.find(x=>x.k===e);
+    // 신강종 개발 모드에서는 기본강종 규격창이 아니라 계열 설계공간을 쓴다
+    const r=dev&&FR[e]?FR[e]:[lo,hi];
+    return {e,lo:Math.max(m.min,r[0]),hi:Math.min(m.max,r[1]),kind:'comp',
+            st:m.s,d:m.d,u:'wt%',n:e};
+  });
+  const proc=()=>{ const win=(dev&&FP)?FP:(GRADES[k].pk||{});
     return PROC_KNOBS.map(e=>{const m=PR.find(x=>x.k===e), w=win[e];
       return {e,lo:w?Math.max(m.min,w[0]):m.min,hi:w?Math.min(m.max,w[1]):m.max,
               kind:'proc',st:m.s,d:m.d,u:m.u,n:m.n};});
@@ -1012,6 +1126,23 @@ function knobList(k,mode){
   return comp().concat(proc());          // 'both' — 성분과 제조조건을 함께 쓴다
 }
 const MODE_KO={comp:'성분',proc:'제조조건',both:'성분+제조조건'};
+/* 입력칸이 허용할 범위 — 화면과 솔버가 같은 창을 쓰도록 */
+function fieldRange(k,kind,key){
+  const fam=GRADES[k].family;
+  if(kind==='comp'){
+    const m=EL.find(x=>x.k===key);
+    if(S.scope==='dev'){ const r=FAM_RANGE[fam][key]||[m.min,m.max];
+      return [Math.max(m.min,r[0]),Math.min(m.max,r[1])]; }
+    const sp=GRADES[k].spec[key], kn=GRADES[k].knobs[key];
+    const lo=Math.max(m.min, sp?sp[0]:(kn?kn[0]:m.min));
+    const hi=Math.min(m.max, sp&&sp[1]!==null?sp[1]:(kn?kn[1]:m.max));
+    return [lo,hi];
+  }
+  const m=PR.find(x=>x.k===key);
+  const win=S.scope==='dev'?FAM_PK[fam]:(GRADES[k].pk||{});
+  const w=win?win[key]:null;
+  return w?[Math.max(m.min,w[0]),Math.min(m.max,w[1])]:[m.min,m.max];
+}
 /* 목적물성 prop 을 target 으로 — mode: 'comp' | 'proc'
    1단계: 단위 원가당 효율이 높은 노브부터 이분법으로 접근 (최소원가 우선)
    2단계: 그래도 목표 미달이면 좌표하강으로 도달 가능한 한계치까지 밀어붙이고,
@@ -1377,23 +1508,36 @@ function review(){
                              Math.min(1.2,(R.cost.conv-560)/90),{k,t:'proc',e:'crAnnV',v:Math.min(150,S.g[k].proc.crAnnV+25)});
 
     /* YELLOW — 시장성 */
+    const near=nearestGrade(R.fam,c);
+    const dev=S.scope==='dev';
     let offSpec=0;
     Object.entries(G.spec).forEach(([e,[lo,hi]])=>{
       if(c[e]<lo-1e-9||(hi!==null&&c[e]>hi+1e-9)) offSpec++;
     });
-    if(offSpec){
-      push('yellow',`${L} 성분 ${offSpec}개 항목이 A240 범위 밖 — 표준강종으로 판매 불가, 고객 승인 필요`,
-           Math.min(3,offSpec*1.5),null);
+    if(!offSpec){
+      push('yellow',`${L} ${G.label} 규격 안 — 표준강종으로 즉시 판매 가능`,0);
+    }else if(dev){
+      // 개발강종은 규격 이탈 자체가 잘못이 아니라, 가까운 상용강종 대비
+      // 차별점이 있는지와 승인 부담이 관건이다
+      if(near.d<1.0)
+        push('yellow',`${L} 기준 규격 ${offSpec}항목 이탈 — 조성이 사실상 ${near.g} 에 해당 (거리 ${near.d.toFixed(2)}). 기존 강종과 겹쳐 신규 개발 명분이 약함`,1.0,null);
+      else if(near.d<2.0)
+        push('yellow',`${L} 기준 규격 ${offSpec}항목 이탈 — ${near.g} 변형강 (거리 ${near.d.toFixed(2)}). 고객 승인 6~12개월 필요`,0.5,null);
+      else
+        push('yellow',`${L} 기준 규격 ${offSpec}항목 이탈 — 신규 조성 (최근접 ${near.g}, 거리 ${near.d.toFixed(2)}). 재질 심사·규격 등재 필요`,0.8,null);
     }else{
-      push('yellow',`${L} A240 성분·기계적 규격 모두 충족 — 표준강종으로 즉시 판매 가능`,0);
+      push('yellow',`${L} 성분 ${offSpec}개 항목이 ${G.label} 규격 밖 — 표준강종으로 판매 불가`,
+           Math.min(3,offSpec*1.5),null);
     }
     const mfail=Object.entries(G.mech).filter(([m,[lo,hi]])=>
       (lo!==null&&R[m]<lo)||(hi!==null&&R[m]>hi)).map(([m])=>m);
-    if(mfail.length) push('yellow',`${L} ${mfail.join(', ')} 규격 미달 — 성적서 발행 불가`,mfail.length*1.5,null);
+    if(mfail.length) push('yellow',
+      dev?`${L} ${mfail.join(', ')} 가 ${G.label} 기준 밖 — 신규 물성 등급으로 제시해야 함`
+         :`${L} ${mfail.join(', ')} 규격 미달 — 성적서 발행 불가`,
+      dev?mfail.length*0.4:mfail.length*1.5,null);
     const pc=(R.cost.total-G.refCost)/G.refCost*100;
-    if(pc>6) push('yellow',`${L} 시장 벤치마크 대비 원가 +${pc.toFixed(0)} % — 가격경쟁력 열위`,Math.min(2,(pc-6)/9),null);
+    if(pc>6) push('yellow',`${L} 기준강종 대비 원가 +${pc.toFixed(0)} % — 그만한 성능 차별점이 필요`,Math.min(2,(pc-6)/9),null);
     else push('yellow',`${L} ${G.demand}`,0);
-
     /* BLACK — 모델 정합 */
     const bad=[...Object.values(R).filter(v=>typeof v==='number'&&!isFinite(v))];
     if(bad.length) push('black',`${L} 모델 발산 — 입력 범위 확인 필요`,3,null);
@@ -1651,13 +1795,19 @@ function fieldHTML(k,kind,m){
   const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':'',
              isPend?"pending":""].filter(Boolean).join(" ")+idcls(k,kind,m.k);
   const spec=kind==='comp'?GRADES[k].spec[m.k]:null;
+  // 기준강종 규격을 벗어났는지는 모드와 무관하게 항상 표시한다 (개발강종 표식)
   const oos=spec&&(v<spec[0]-1e-9||(spec[1]!==null&&v>spec[1]+1e-9))?' oos':'';
+  const [rlo,rhi]=fieldRange(k,kind,m.k);
   const hint=spec?`${spec[0]}–${spec[1]===null?'—':spec[1]}`:(m.u||'');
   const was=isPend?`<u title="반영 전 값">${f(committed,m.d)}</u>`:'';
-  return `<div class="f"><label>${m.n||m.k}<i>${was||hint}</i></label>
+  const title=kind==='comp'
+    ? `${GRADES[k].label} 규격 ${spec?spec[0]+'–'+(spec[1]===null?'—':spec[1]):'해당 없음'} / 입력 가능 ${f(rlo,m.d)}–${f(rhi,m.d)}`
+    : `조업창 ${f(rlo,m.d)}–${f(rhi,m.d)} ${m.u}`;
+  return `<div class="f"><label title="${title}">${m.n||m.k}<i>${was||hint}</i></label>
     <input type="number" class="${cls}${oos}" value="${v}" step="${m.s}"
       data-g="${k}" data-kind="${kind}" data-key="${m.k}"
-      min="${m.min}" max="${m.max}" aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
+      min="${rlo}" max="${rhi}" title="${title}"
+      aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
 }
 function propHTML(k,g){
   const R=S.res[k], sp=GRADES[k].mech;
@@ -1754,11 +1904,15 @@ function bayHTML(k){
   const G=GRADES[k], R=S.res[k], cons=constraints(k,R), ops=operability(k);
   const chips=[];
   const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
-  chips.push(specOK?['ok','A240 적합']:['no','A240 부적합']);
+  chips.push(specOK?["ok","기준규격 적합"]:["no","기준규격 이탈"]);
   chips.push(cons.filter(x=>x.lv==='wa').length
     ?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상']);
   chips.push(ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능']);
-  chips.push(['ok',`${f(R.cost.total,0)} USD/t`]);
+  const near=nearestGrade(R.fam,S.g[k].comp);
+  const offN=Object.entries(G.spec).filter(([e,[lo,hi]])=>{const v=S.g[k].comp[e];
+    return v<lo-1e-9||(hi!==null&&v>hi+1e-9);}).length;
+  chips.push(offN?["wa",`개발강종 · 최근접 ${near.g}`]:["ok",`표준 ${G.label}`]);
+  chips.push(["ok",`${f(R.cost.total,0)} USD/t`]);
   return `<section class="bay" data-bay="${k}"${k===S.tab?"":" hidden"}>
     <header class="bay-head">
       <div class="bay-id"><b>${G.famKo}</b><span>기준 ${G.label} · ${G.note}</span></div>
@@ -1987,9 +2141,13 @@ function refreshOut(){
     const bay=document.querySelector(`[data-bay="${k}"]`); if(!bay) return;
     const R=S.res[k], cons=constraints(k,R), ops=operability(k);
     const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
-    const chips=[specOK?['ok','A240 적합']:['no','A240 부적합'],
+    const near=nearestGrade(R.fam,S.g[k].comp);
+    const offN=Object.entries(GRADES[k].spec).filter(([e,[lo,hi]])=>{const v=S.g[k].comp[e];
+      return v<lo-1e-9||(hi!==null&&v>hi+1e-9);}).length;
+    const chips=[specOK?['ok','기준규격 적합']:['no','기준규격 이탈'],
       cons.filter(x=>x.lv==='wa').length?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상'],
       ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능'],
+      offN?['wa',`개발강종 · 최근접 ${near.g}`]:['ok',`표준 ${GRADES[k].label}`],
       ['ok',`${f(R.cost.total,0)} USD/t`]];
     bay.querySelector('.chips').innerHTML=chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('');
     bay.querySelector('.col.out').innerHTML=
@@ -2131,6 +2289,37 @@ function logApply(k,items,A,B){
   S.log[k].push(`<b>${esc(head)}</b>${d}<br><span class="d">경로: ${why}`
     +(Math.abs(B.d-A.d)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`);
 }
+
+/* ── 설계 범위 전환 : 기준강종 규격 준수 ↔ 신강종 개발 ─────── */
+function renderScope(){
+  const b=$('#btnScope'); if(!b) return;
+  const dev=S.scope==='dev';
+  b.textContent='설계 범위: '+(dev?'신강종 개발':'기준규격 준수');
+  b.classList.toggle('pri',dev);
+  b.title=dev
+    ? '기준강종 규격을 벗어나 계열 전체 설계공간에서 새 조성을 만들 수 있습니다. 규격 이탈은 개발강종 표식으로만 표시됩니다.'
+    : '기준강종(304/410/430/439) 규격 안에서만 설계합니다. 규격 이탈은 불합격으로 판정됩니다.';
+}
+$('#btnScope').onclick=()=>{
+  S.scope=S.scope==='dev'?'std':'dev';
+  renderScope();
+  // 범위가 좁아지면 현재 값이 창 밖일 수 있으므로 입력창 범위만 다시 그린다
+  render();
+  ask(`설계 범위를 ${S.scope==='dev'?'신강종 개발':'기준규격 준수'} 로 전환`,
+    S.scope==='dev'
+    ? `<p>이제 기준강종 규격을 벗어나 <b>계열 전체 설계공간</b>에서 조성을 잡을 수 있습니다.
+       오스테나이트계는 Cr 16~26 · Ni 6~22 · Mo 0~4 · Mn 0.2~8 · N 0.01~0.35 %,
+       페라이트계는 Cr 10.5~30 · Mo 0~4.5 · Ti/Nb 0~1 %,
+       마르텐사이트계는 C 0.03~0.90 · Cr 11~18 · Ni 0~4 % 범위입니다.</p>
+      <p>기준강종 규격 이탈은 <b>개발강종</b> 표식으로만 표시하고 불합격으로 보지 않습니다.
+       다만 아래 세 가지는 모드와 무관하게 지킵니다 — Cr ≥ 10.5 %, PREN ≥ 11,
+       그리고 계열 정체성(오스테나이트계가 듀플렉스로, 페라이트계가 마르텐사이트계로
+       넘어가지 않을 것). 이걸 넘으면 모델의 적용역 자체를 벗어납니다.</p>
+      <p>설계 조성이 어느 상용강종에 가까운지는 각 계열 상단 칩에 <b>최근접 강종</b>으로 표시됩니다.</p>`
+    : `<p>기준강종 규격 안에서만 설계합니다. 규격을 벗어난 항목은 불합격으로 판정되고
+       역설계 솔버도 규격창 밖으로 나가지 않습니다.</p>`);
+};
+renderScope();
 /* ══════════════════════════════════════════════════════════════
    11. 원료 단가 패널
    ══════════════════════════════════════════════════════════════ */

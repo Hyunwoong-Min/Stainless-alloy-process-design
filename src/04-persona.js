@@ -46,23 +46,36 @@ function review(){
                              Math.min(1.2,(R.cost.conv-560)/90),{k,t:'proc',e:'crAnnV',v:Math.min(150,S.g[k].proc.crAnnV+25)});
 
     /* YELLOW — 시장성 */
+    const near=nearestGrade(R.fam,c);
+    const dev=S.scope==='dev';
     let offSpec=0;
     Object.entries(G.spec).forEach(([e,[lo,hi]])=>{
       if(c[e]<lo-1e-9||(hi!==null&&c[e]>hi+1e-9)) offSpec++;
     });
-    if(offSpec){
-      push('yellow',`${L} 성분 ${offSpec}개 항목이 A240 범위 밖 — 표준강종으로 판매 불가, 고객 승인 필요`,
-           Math.min(3,offSpec*1.5),null);
+    if(!offSpec){
+      push('yellow',`${L} ${G.label} 규격 안 — 표준강종으로 즉시 판매 가능`,0);
+    }else if(dev){
+      // 개발강종은 규격 이탈 자체가 잘못이 아니라, 가까운 상용강종 대비
+      // 차별점이 있는지와 승인 부담이 관건이다
+      if(near.d<1.0)
+        push('yellow',`${L} 기준 규격 ${offSpec}항목 이탈 — 조성이 사실상 ${near.g} 에 해당 (거리 ${near.d.toFixed(2)}). 기존 강종과 겹쳐 신규 개발 명분이 약함`,1.0,null);
+      else if(near.d<2.0)
+        push('yellow',`${L} 기준 규격 ${offSpec}항목 이탈 — ${near.g} 변형강 (거리 ${near.d.toFixed(2)}). 고객 승인 6~12개월 필요`,0.5,null);
+      else
+        push('yellow',`${L} 기준 규격 ${offSpec}항목 이탈 — 신규 조성 (최근접 ${near.g}, 거리 ${near.d.toFixed(2)}). 재질 심사·규격 등재 필요`,0.8,null);
     }else{
-      push('yellow',`${L} A240 성분·기계적 규격 모두 충족 — 표준강종으로 즉시 판매 가능`,0);
+      push('yellow',`${L} 성분 ${offSpec}개 항목이 ${G.label} 규격 밖 — 표준강종으로 판매 불가`,
+           Math.min(3,offSpec*1.5),null);
     }
     const mfail=Object.entries(G.mech).filter(([m,[lo,hi]])=>
       (lo!==null&&R[m]<lo)||(hi!==null&&R[m]>hi)).map(([m])=>m);
-    if(mfail.length) push('yellow',`${L} ${mfail.join(', ')} 규격 미달 — 성적서 발행 불가`,mfail.length*1.5,null);
+    if(mfail.length) push('yellow',
+      dev?`${L} ${mfail.join(', ')} 가 ${G.label} 기준 밖 — 신규 물성 등급으로 제시해야 함`
+         :`${L} ${mfail.join(', ')} 규격 미달 — 성적서 발행 불가`,
+      dev?mfail.length*0.4:mfail.length*1.5,null);
     const pc=(R.cost.total-G.refCost)/G.refCost*100;
-    if(pc>6) push('yellow',`${L} 시장 벤치마크 대비 원가 +${pc.toFixed(0)} % — 가격경쟁력 열위`,Math.min(2,(pc-6)/9),null);
+    if(pc>6) push('yellow',`${L} 기준강종 대비 원가 +${pc.toFixed(0)} % — 그만한 성능 차별점이 필요`,Math.min(2,(pc-6)/9),null);
     else push('yellow',`${L} ${G.demand}`,0);
-
     /* BLACK — 모델 정합 */
     const bad=[...Object.values(R).filter(v=>typeof v==='number'&&!isFinite(v))];
     if(bad.length) push('black',`${L} 모델 발산 — 입력 범위 확인 필요`,3,null);

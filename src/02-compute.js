@@ -91,15 +91,27 @@ function compute(key, comp, proc, prices){
     R.tsPick=15.4*pt;
     R.trip=3.0*R.V30;
     TS=R.tsPick+R.trip+12;
-    ELg=58-0.008*Math.pow(R.md30-10,2)-0.030*(YS-250)-1.5*dF
+    // 연신율 — Md30 의존성. 2차식은 최적점 근방에서만 유효해서 안정형
+    // 오스테나이트(316L·310S, Md30 ≪ 0)에서 발산한다. 양쪽으로 포화하는
+    // 비대칭 종형으로 바꿔, TRIP 이 없어도 연신이 50 % 대에 머무르게 한다.
+    //   Md30 ≈ +10 : TRIP 최적, 연신 최대
+    //   Md30 ≪ 0   : 안정형 — TRIP 없음, 균일연신만 (하한 52)
+    //   Md30 ≫ +10 : 과준안정형 — α′ 조기 생성으로 변형 국부화 (하한 40)
+    const md=R.md30, PEAK=58;
+    const elMd = md<=10 ? 52+(PEAK-52)*Math.exp(-Math.pow((md-10)/55,2))
+                        : 40+(PEAK-40)*Math.exp(-Math.pow((md-10)/40,2));
+    ELg=elMd-0.020*(YS-250)-0.020*(TS-620)-1.5*dF
         +cl(0.05*(R.d-25),-1.5,2.5)-2.5*Math.max(0,0.6-p.crT);
+    ELg=cl(ELg,8,62);
     HV=0.21*TS+0.09*YS+5;
   }else{
     const freeI=Math.min(Ceff+Neff, subCR?0.002:0.008);
     R.freeI=freeI;
     const ysF=55+3.7*c.Cr+83*c.Si+32*c.Mn+11*c.Mo+690*c.P+5000*freeI
               +18.97*hp+180*Math.min(0.5,c.Nb)
-              +(fam==='martensitic'?-35:0);
+              +(fam==="martensitic"?-53:0)
+              // 아임계 소둔재의 구상화 탄화물 강화 — C 가 높을수록 탄화물 분율이 커진다
+              +((fam==="martensitic"&&subCR)?450*Math.min(0.5,Math.max(0,c.C-0.08)):0);
     const tsF=ysF+175+900*freeI;
     R.rbar=cl(1.00+0.010*(crRed-60)+(p.hrAnnT>800?0.5:0)-6*(c.C+c.N)
               +1.0*Math.min(0.4,c.Nb+c.Ti),0.7,1.95);
@@ -117,6 +129,7 @@ function compute(key, comp, proc, prices){
     HV=0.26*TS+0.05*YS+14;
   }
   R.YS=YS; R.TS=TS; R.EL=Math.max(2,ELg); R.HV=HV;
+  R.elMd = fam==="austenitic" ? ELg : null;
 
   /* ── 3-8 내식성 ─────────────────────────────────────────── */
   const famOff={austenitic:0,ferritic:-50,martensitic:-60}[fam];

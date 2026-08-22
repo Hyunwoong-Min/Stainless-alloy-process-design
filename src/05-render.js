@@ -194,13 +194,19 @@ function fieldHTML(k,kind,m){
   const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':'',
              isPend?"pending":""].filter(Boolean).join(" ")+idcls(k,kind,m.k);
   const spec=kind==='comp'?GRADES[k].spec[m.k]:null;
+  // 기준강종 규격을 벗어났는지는 모드와 무관하게 항상 표시한다 (개발강종 표식)
   const oos=spec&&(v<spec[0]-1e-9||(spec[1]!==null&&v>spec[1]+1e-9))?' oos':'';
+  const [rlo,rhi]=fieldRange(k,kind,m.k);
   const hint=spec?`${spec[0]}–${spec[1]===null?'—':spec[1]}`:(m.u||'');
   const was=isPend?`<u title="반영 전 값">${f(committed,m.d)}</u>`:'';
-  return `<div class="f"><label>${m.n||m.k}<i>${was||hint}</i></label>
+  const title=kind==='comp'
+    ? `${GRADES[k].label} 규격 ${spec?spec[0]+'–'+(spec[1]===null?'—':spec[1]):'해당 없음'} / 입력 가능 ${f(rlo,m.d)}–${f(rhi,m.d)}`
+    : `조업창 ${f(rlo,m.d)}–${f(rhi,m.d)} ${m.u}`;
+  return `<div class="f"><label title="${title}">${m.n||m.k}<i>${was||hint}</i></label>
     <input type="number" class="${cls}${oos}" value="${v}" step="${m.s}"
       data-g="${k}" data-kind="${kind}" data-key="${m.k}"
-      min="${m.min}" max="${m.max}" aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
+      min="${rlo}" max="${rhi}" title="${title}"
+      aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
 }
 function propHTML(k,g){
   const R=S.res[k], sp=GRADES[k].mech;
@@ -297,11 +303,15 @@ function bayHTML(k){
   const G=GRADES[k], R=S.res[k], cons=constraints(k,R), ops=operability(k);
   const chips=[];
   const specOK=!cons.some(x=>x.id.startsWith('spec_')||x.id.startsWith('mech_'));
-  chips.push(specOK?['ok','A240 적합']:['no','A240 부적합']);
+  chips.push(specOK?["ok","기준규격 적합"]:["no","기준규격 이탈"]);
   chips.push(cons.filter(x=>x.lv==='wa').length
     ?['wa',`야금 주의 ${cons.filter(x=>x.lv==='wa').length}`]:['ok','야금 정상']);
   chips.push(ops.length?['no',`조업 오류 ${ops.length}`]:['ok','조업 가능']);
-  chips.push(['ok',`${f(R.cost.total,0)} USD/t`]);
+  const near=nearestGrade(R.fam,S.g[k].comp);
+  const offN=Object.entries(G.spec).filter(([e,[lo,hi]])=>{const v=S.g[k].comp[e];
+    return v<lo-1e-9||(hi!==null&&v>hi+1e-9);}).length;
+  chips.push(offN?["wa",`개발강종 · 최근접 ${near.g}`]:["ok",`표준 ${G.label}`]);
+  chips.push(["ok",`${f(R.cost.total,0)} USD/t`]);
   return `<section class="bay" data-bay="${k}"${k===S.tab?"":" hidden"}>
     <header class="bay-head">
       <div class="bay-id"><b>${G.famKo}</b><span>기준 ${G.label} · ${G.note}</span></div>
