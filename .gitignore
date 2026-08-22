@@ -12,3 +12,6 @@ Desktop.ini
 # 임시 산출물
 *.tmp
 tmp
+
+# 바로 열기용 사본 (dist/index.html 과 동일 내용)
+강종 설계 워크벤치.html

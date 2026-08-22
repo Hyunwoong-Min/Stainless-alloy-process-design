@@ -42,7 +42,19 @@
 ./build.sh
 ```
 
-`src/index.html`(셸)과 `src/0*.js`(모델·솔버·렌더러)를 합쳐 `dist/index.html` 단일 파일을 만듭니다. 의존성·빌드 도구·네트워크 요청이 전혀 없으므로 산출물을 브라우저로 바로 열면 됩니다.
+`src/index.html`(셸)과 `src/0*.js`(모델·솔버·렌더러)를 합쳐 단일 파일 앱을 만듭니다. 의존성·빌드 도구·네트워크 요청이 전혀 없으므로 산출물을 브라우저로 바로 열면 됩니다.
+
+산출물은 내용이 동일한 두 곳에 생성되며, 스크립트가 `cmp` 로 동일성을 검증합니다.
+
+| 경로 | 용도 |
+|---|---|
+| `dist/index.html` | 로컬 실행·배포용 |
+| `docs/index.html` | GitHub Pages (`main` 브랜치 `/docs` 서빙) |
+| `docs/.nojekyll` | Pages 의 Jekyll 전처리 비활성화 (없으면 스크립트가 생성) |
+
+Pages는 저장소 **Settings → Pages → Source: Deploy from a branch → Branch: `main` / `/docs`** 로 설정합니다.
+
+**소스를 고치면 반드시 `./build.sh` 를 실행한 뒤 두 산출물까지 함께 커밋**하십시오. `src/` 만 커밋하면 배포본이 소스와 어긋납니다.
 
 ```
 src/
