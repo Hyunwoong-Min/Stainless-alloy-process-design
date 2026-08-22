@@ -168,9 +168,11 @@ function summaryHTML(k){
     ${c.items?`<ul class="sum-items">${c.items.map(x=>`<li><b>${esc(x.label)}</b> <span class="num">${f(x.from,x.d)}</span> → <span class="num">${f(x.to,x.d)}</span> ${esc(x.unit)}</li>`).join("")}</ul>`:""}
     ${c.miss?`<div class="sum-miss"><b>목표 미달</b>
       ${esc(c.miss.label)} 목표 <span class="num">${f(c.miss.target,c.d)}</span> ${esc(c.miss.unit)} 는
-      ${esc(c.miss.mode)} 조정만으로 도달할 수 없습니다. 규격·조업창 안에서 가능한 한계가
+      ${esc(c.miss.mode)} 조정만으로는 도달하지 못했습니다. 규격·조업창 안에서 탐색으로 찾은 최선이
       <span class="num">${f(c.miss.reach,c.d)}</span> ${esc(c.miss.unit)} 입니다.
-      ${c.miss.bind?`<br>한계에 닿은 항목: ${esc(c.miss.bind)}`:''}</div>`:''}
+      ${c.miss.bind?`<br>한계에 닿은 항목: ${esc(c.miss.bind)}`:''}
+      <br><span class="sum-fine">결합된 비선형 모델을 수치탐색한 결과이므로 이론적 상한과
+      수 % 차이가 날 수 있습니다. 목표 자체가 규격 범위 밖이라는 판정은 유효합니다.</span></div>`:''}
     <div class="sum-grid">
       <div><div class="sum-t">야금 경로</div>
         ${mid.length?`<ul class="sum-mid">${mid.join('')}</ul>`

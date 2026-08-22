@@ -114,11 +114,13 @@ function knobList(k,mode){
    2단계: 그래도 목표 미달이면 좌표하강으로 도달 가능한 한계치까지 밀어붙이고,
           그 한계치와 한계를 만든 제약을 함께 보고한다 */
 function solve(k,prop,target,mode){
+  const t0=performance.now();
   const R0=S.res[k], base=R0[prop];
   const steps=[], knobs=knobList(k,mode), rejected=[];
   const want=Math.sign(target-base);                  // +1 이면 올려야 함
   const tol=Math.abs(target)*0.004;
-  const getv=e=>(mode==='comp'?S.g[k].comp:S.g[k].proc)[e];
+  const getv=e=>(mode==="comp"?S.g[k].comp:S.g[k].proc)[e];
+  const orig={}; knobs.forEach(kb=>orig[kb.e]=(mode==="comp"?S.g[k].comp:S.g[k].proc)[kb.e]);
   const setv=(e,v)=>{ (mode==='comp'?S.g[k].comp:S.g[k].proc)[e]=v; };
 
   // 새 'no' 등급 제약이 생기지 않는 변경만 채택
@@ -143,16 +145,32 @@ function solve(k,prop,target,mode){
   };
 
   // 6-1 민감도 · 단가탄력도
+  // 국소 미분만 쓰면 문턱형 인자를 놓친다. 예로 430 의 Ti 는 현재값 부근에서
+  // 기울기가 0 이지만(TiN 고정에도 못 미치는 양), 완전 안정화 수준까지 올리면
+  // 예민화가 사라져 공식전위가 크게 오른다. 그래서 전 구간 할선(secant)도 함께 본다.
   const sens=knobs.map(kb=>{
     const v0=getv(kb.e);
     const h=Math.max(kb.st,(kb.hi-kb.lo)/60);
     const vp=Math.min(kb.hi,v0+h), vm=Math.max(kb.lo,v0-h);
     if(vp-vm<1e-12) return null;
     const Rp=trial(k,mode,kb.e,vp), Rm=trial(k,mode,kb.e,vm);
-    const dP=(Rp[prop]-Rm[prop])/(vp-vm);
+    let dP=(Rp[prop]-Rm[prop])/(vp-vm);
     const dC=(Rp.cost.total-Rm.cost.total)/(vp-vm);
-    if(!isFinite(dP)||Math.abs(dP)<1e-9) return null;
-    return {...kb,v0,dP,dC,eff:Math.abs(dP)/(Math.abs(dC)+0.35)};
+    // 전 구간 할선 — 구간 양끝과 중간 몇 점을 보고 최대 변화폭을 잡는다
+    let plo=Infinity, phi=-Infinity;
+    for(let i=0;i<=8;i++){
+      const pv=trial(k,mode,kb.e,kb.lo+(kb.hi-kb.lo)*i/8)[prop];
+      if(pv<plo) plo=pv; if(pv>phi) phi=pv;
+    }
+    const span=phi-plo;
+    if(!isFinite(dP)) dP=0;
+    if(Math.abs(dP)<1e-9){
+      if(span<Math.max(1e-6,Math.abs(R0[prop])*0.002)) return null;   // 정말 무관한 노브
+      const pHi=trial(k,mode,kb.e,kb.hi)[prop], pLo=trial(k,mode,kb.e,kb.lo)[prop];
+      dP=(pHi-pLo)/(kb.hi-kb.lo);
+      if(Math.abs(dP)<1e-9) dP=span/(kb.hi-kb.lo);   // 비단조면 폭으로 대체
+    }
+    return {...kb,v0,dP,dC,span,eff:Math.abs(dP)/(Math.abs(dC)+0.35)};
   }).filter(Boolean).sort((a,b)=>b.eff-a.eff);
 
   // 6-2 1단계 — 효율 순 이분법
@@ -170,7 +188,10 @@ function solve(k,prop,target,mode){
       bv=(a+b)/2;
     }else bv=Math.abs(flo)<Math.abs(fhi)?lo:hi;
     bv=cl(Math.round(bv/kb.st)*kb.st,kb.lo,kb.hi);
-    if(Math.abs(bv-v0)<kb.st*0.5) continue;
+    // 스냅 때문에 구간 끝을 못 밟는 경우 보정
+    if(Math.abs(bv-kb.lo)<kb.st) bv=Math.abs(fn(kb.lo))<Math.abs(fn(bv))?kb.lo:bv;
+    if(Math.abs(bv-kb.hi)<kb.st) bv=Math.abs(fn(kb.hi))<Math.abs(fn(bv))?kb.hi:bv;
+    if(Math.abs(bv-v0)<1e-12) continue;
     const r=tryMove(kb.e,bv);
     if(!r) continue;
     if(!r.ok){ rejected.push({knob:kb.e,mode,to:bv,d:kb.d,eff:kb.eff,
@@ -178,35 +199,141 @@ function solve(k,prop,target,mode){
     record(kb,r.v0,bv,r.before,r.Rn);
   }
 
-  // 6-3 2단계 — 아직 목표에 못 미치면 좌표하강으로 한계치 탐색
+  // 6-3 2단계 — 목표 미달이면 한계치를 다시 찾는다.
+  // 1단계는 각 노브를 끝값으로 밀어붙이므로 상호작용이 강한 계(Ti–N–C 결합 등)에서
+  // 나쁜 모서리에 갇힐 수 있다. 그래서 원래 상태로 되돌린 뒤 좌표상승을 새로 돌리고,
+  // 1단계 결과와 비교해 목표에 더 가까운 쪽을 채택한다.
   let limited=false, binding=[];
   if(Math.abs(target-S.res[k][prop])>=tol){
-    for(let pass=0; pass<5; pass++){
+    const s1val=S.res[k][prop];
+    const s1state={}; knobs.forEach(kb=>s1state[kb.e]=getv(kb.e));
+    knobs.forEach(kb=>setv(kb.e,orig[kb.e]));       // 원점 복귀
+    S.res[k]=calc(k);
+
+    for(let pass=0; pass<16; pass++){
+      if(performance.now()-t0>400) break;            // 응답성 보장용 시간 예산
       const prev=S.res[k][prop];
-      for(const kb of sens){
-        const v0=getv(kb.e), n=24;
-        let bestV=v0, bestP=S.res[k][prop];
-        for(let i=0;i<=n;i++){
-          const v=cl(Math.round((kb.lo+(kb.hi-kb.lo)*i/n)/kb.st)*kb.st,kb.lo,kb.hi);
-          const pv=trial(k,mode,kb.e,v)[prop];
-          // 목표 방향으로 더 나아가되 목표를 넘지는 않도록
-          const better = want>0 ? (pv>bestP && pv<=target+tol) : (pv<bestP && pv>=target-tol);
-          if(better){ bestP=pv; bestV=v; }
+      // 좌표법은 노브 순서에 따라 다른 국소해에 갇힌다. 매 패스마다 방향을 뒤집는다.
+      const order=(pass%2)?sens.slice().reverse():sens;
+      const baseBad=constraints(k,S.res[k]).filter(x=>x.lv==="no").map(x=>x.id);
+      for(const kb of order){
+        const v0=getv(kb.e);
+        // 후보값 생성 — 스텝 격자에 스냅하되 구간 양끝은 반드시 포함한다.
+        // (예: S 는 스텝 0.0005 라 반올림하면 하한 0.0004 를 영영 밟지 못한다)
+        const cands=(lo,hi,n)=>{
+          const a=[kb.lo,kb.hi,lo,hi];
+          for(let i=0;i<=n;i++) a.push(cl(Math.round((lo+(hi-lo)*i/n)/kb.st)*kb.st,kb.lo,kb.hi));
+          return [...new Set(a.map(v=>cl(v,kb.lo,kb.hi)))];
+        };
+        // 규격을 깨지 않는 후보 중 목표에 가장 가까운 값. 최적값이 막히면
+        // 통째로 포기하지 말고 규격을 지키는 차선값을 쓴다.
+        const scan=(lo,hi,n)=>{
+          let bv=null,bp=S.res[k][prop];
+          for(const v of cands(lo,hi,n)){
+            const R2=trial(k,mode,kb.e,v);
+            const pv=R2[prop];
+            const better = want>0 ? (pv>bp && pv<=target+tol) : (pv<bp && pv>=target-tol);
+            if(!better) continue;
+            const born=constraints(k,R2).filter(x=>x.lv==='no'&&!baseBad.includes(x.id));
+            if(born.length){
+              if(!rejected.some(x=>x.knob===kb.e))
+                rejected.push({knob:kb.e,mode,to:v,d:kb.d,eff:kb.eff,
+                               why:born.map(x=>x.txt)});
+              continue;
+            }
+            bp=pv; bv=v;
+          }
+          return bv;
+        };
+        let best=scan(kb.lo,kb.hi,24);
+        if(best!==null){
+          const w=(kb.hi-kb.lo)/12;
+          const fine=scan(Math.max(kb.lo,best-w),Math.min(kb.hi,best+w),16);
+          if(fine!==null) best=fine;
         }
-        if(Math.abs(bestV-v0)<kb.st*0.5) continue;
-        const r=tryMove(kb.e,bestV);
-        if(!r) continue;
-        if(!r.ok){ if(!rejected.some(x=>x.knob===kb.e))
-            rejected.push({knob:kb.e,mode,to:bestV,d:kb.d,eff:kb.eff,
-                           why:r.born.map(x=>x.txt)});
-          continue; }
-        record(kb,r.v0,bestV,r.before,r.Rn);
+        if(best===null||Math.abs(best-v0)<1e-12) continue;
+        const r=tryMove(kb.e,best);
+        if(!r||!r.ok) continue;
       }
-      if(Math.abs(S.res[k][prop]-prev)<Math.abs(target)*0.0005) break;
+      if(Math.abs(S.res[k][prop]-prev)<Math.abs(target)*0.00005) break;
     }
+    // 규격선에 붙어 정체하면 — 목적물성을 개선하지는 않지만 구속 규격의 여유를
+    // 넓히는 수를 먼저 두고 다시 오른다. (예: 304 YS 는 EL 40 % 선에 걸리는데,
+    // Mn·Cu 를 낮춰 Md30 을 최적점으로 옮기면 EL 여유가 생겨 Cr·Si 를 더 올릴 수 있다)
+    const margin=()=>{
+      const R=S.res[k]; let m=Infinity;
+      Object.entries(GRADES[k].mech).forEach(([mk,[lo,hi]])=>{
+        if(lo!==null) m=Math.min(m,(R[mk]-lo)/Math.abs(lo));
+        if(hi!==null) m=Math.min(m,(hi-R[mk])/Math.abs(hi));
+      });
+      return m;
+    };
+    for(let round=0; round<4; round++){
+      if(performance.now()-t0>700) break;
+      if(Math.abs(target-S.res[k][prop])<tol) break;
+      const p0=S.res[k][prop];
+      const baseBad2=constraints(k,S.res[k]).filter(x=>x.lv==='no').map(x=>x.id);
+      let moved=false;
+      for(const kb of sens){
+        const v0=getv(kb.e), pNow=S.res[k][prop], mNow=margin();
+        let bv=null, bm=mNow;
+        for(let i=0;i<=32;i++){
+          const v=cl(Math.round((kb.lo+(kb.hi-kb.lo)*i/32)/kb.st)*kb.st,kb.lo,kb.hi);
+          const R2=trial(k,mode,kb.e,v);
+          // 목적물성은 거의 유지하되(0.3 % 이내 손실) 규격 여유는 늘리는 수
+          const keep = want>0 ? R2[prop]>=pNow-Math.abs(pNow)*0.003
+                              : R2[prop]<=pNow+Math.abs(pNow)*0.003;
+          if(!keep) continue;
+          if(constraints(k,R2).filter(x=>x.lv==='no'&&!baseBad2.includes(x.id)).length) continue;
+          const sv=(()=>{ const sav=getv(kb.e); setv(kb.e,v); const t=S.res[k]; S.res[k]=R2;
+            const mm=margin(); S.res[k]=t; setv(kb.e,sav); return mm; })();
+          if(sv>bm+1e-9){ bm=sv; bv=v; }
+        }
+        if(bv===null||Math.abs(bv-v0)<1e-12) continue;
+        const r=tryMove(kb.e,bv);
+        if(r&&r.ok) moved=true;
+      }
+      if(!moved) break;
+      // 여유를 벌었으면 다시 개선 방향으로 두 패스
+      for(let pass=0; pass<2; pass++){
+        const baseBad=constraints(k,S.res[k]).filter(x=>x.lv==='no').map(x=>x.id);
+        for(const kb of sens){
+          const v0=getv(kb.e); let bv=null,bp=S.res[k][prop];
+          for(let i=0;i<=32;i++){
+            const v=cl(Math.round((kb.lo+(kb.hi-kb.lo)*i/32)/kb.st)*kb.st,kb.lo,kb.hi);
+            const R2=trial(k,mode,kb.e,v), pv=R2[prop];
+            const better = want>0 ? (pv>bp && pv<=target+tol) : (pv<bp && pv>=target-tol);
+            if(!better) continue;
+            if(constraints(k,R2).filter(x=>x.lv==='no'&&!baseBad.includes(x.id)).length) continue;
+            bp=pv; bv=v;
+          }
+          if(bv!==null&&Math.abs(bv-v0)>1e-12) tryMove(kb.e,bv);
+        }
+      }
+      if(Math.abs(S.res[k][prop]-p0)<Math.abs(target)*0.00005) break;
+    }
+
+    // 두 결과 중 목표에 가까운 쪽 채택
+    if(Math.abs(target-s1val) < Math.abs(target-S.res[k][prop])){
+      knobs.forEach(kb=>setv(kb.e,s1state[kb.e]));
+      S.res[k]=calc(k);
+    }
+    // 최종 상태 기준으로 steps 재구성 — 노브별 기여는 그 노브만 원래대로 되돌린 차이로 정의
+    steps.length=0;
+    const fin=S.res[k];
+    knobs.forEach(kb=>{
+      const to=getv(kb.e), from=orig[kb.e];
+      if(Math.abs(to-from)<kb.st*0.5) return;
+      const back=trial(k,mode,kb.e,from);
+      steps.push({knob:kb.e,mode,from,to,d:kb.d,
+        dP:fin[prop]-back[prop], dC:fin.cost.total-back.cost.total,
+        sens:(sens.find(s=>s.e===kb.e)||{dP:0}).dP,
+        unit:mode==='comp'?'wt%':(PR.find(x=>x.k===kb.e).u)});
+      S.g[k].solved[kb.e]=1;
+    });
+
     if(Math.abs(target-S.res[k][prop])>=tol){
       limited=true;
-      // 한계를 만든 요인 — 규격/조업창 끝에 닿은 노브
       binding=sens.filter(kb=>{
         const v=getv(kb.e);
         return Math.abs(v-kb.lo)<kb.st*0.6 || Math.abs(v-kb.hi)<kb.st*0.6;
