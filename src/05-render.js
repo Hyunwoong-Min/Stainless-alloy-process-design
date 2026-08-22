@@ -162,10 +162,11 @@ function summaryHTML(k){
 
   return `<div class="sumbox">
     <div class="sum-h"><b>변경 요약</b>
-      <span class="sum-what">${esc(c.what)}${c.items?"":` <span class="num">${f(c.from,c.d)}</span> →`}
-      ${c.items?"":`<span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}`}</span>
+      <span class="sum-what">${esc(c.what)}${c.from===null?'':
+        ` <span class="num">${f(c.from,c.d)}</span> → <span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}`}</span>
       <span class="sum-mode">${c.mode}</span></div>
-    ${c.items?`<ul class="sum-items">${c.items.map(x=>`<li><b>${esc(x.label)}</b> <span class="num">${f(x.from,x.d)}</span> → <span class="num">${f(x.to,x.d)}</span> ${esc(x.unit)}</li>`).join("")}</ul>`:""}
+    ${c.items?`<div class="sum-t">바꾼 항목 ${c.items.length}건</div>
+      <ul class="sum-items">${c.items.map(x=>`<li><b>${esc(x.label)}</b> <span class="num">${f(x.from,x.d)}</span> → <span class="num">${f(x.to,x.d)}</span> ${esc(x.unit)}</li>`).join('')}</ul>`:''}
     ${c.miss?`<div class="sum-miss"><b>목표 미달</b>
       ${esc(c.miss.label)} 목표 <span class="num">${f(c.miss.target,c.d)}</span> ${esc(c.miss.unit)} 는
       ${esc(c.miss.mode)} 조정만으로는 도달하지 못했습니다. 규격·조업창 안에서 탐색으로 찾은 최선이

@@ -54,6 +54,7 @@ function bindBays(){ if(bound) return; bound=true;
       &nbsp;무엇을 바꿔 맞출까요?</p>
       <button class="btn sm" data-solve="comp">성분 변경</button>
       <button class="btn sm" data-solve="proc">제조조건 변경</button>
+      <button class="btn sm" data-solve="both">둘 다 변경</button>
       <button class="btn sm" data-solve="cancel">취소</button>`;
     document.querySelectorAll('.prop').forEach(p=>p.classList.remove('tgt'));
     t.closest('.prop').classList.add('tgt');
@@ -79,24 +80,24 @@ function bindBays(){ if(bound) return; bound=true;
     logInverse(k,r);
     const pm=PROP.find(x=>x.k===pk);
     const miss=Math.abs(r.achieved-r.target)>=Math.abs(r.target)*0.01;
-    const bindTxt=(r.binding||[]).map(b=>
-      `${mode==='comp'?b.e:PR.find(x=>x.k===b.e).n} ${b.at}`).join(', ');
+    const mko=MODE_KO[mode]||mode;
+    const bindTxt=(r.binding||[]).map(b=>`${b.name||b.e} ${b.at}`).join(', ');
+    // 솔버가 실제로 바꾼 항목 — 변경 요약에 그대로 나열한다
+    const list=r.steps.map(s=>({label:(s.mode==='proc'?'[공정] ':'[성분] ')+(s.name||s.knob),
+                                from:s.from,to:s.to,d:s.d,unit:s.unit}));
     snap(k,pm.n,r.base,r.achieved,pm.d,pm.u,
-         mode==='comp'?'역설계 · 성분 조정':'역설계 · 제조조건 조정',
+         `역설계 · ${mko} 조정`,
          bIn,S.res[k],
          (r.steps.length
-           ? (mode==='comp'?'성분 ':'제조조건 ')
-             +r.steps.map(s=>s.mode==='comp'?s.knob:PR.find(x=>x.k===s.knob).n).join(', ')
-             +' 을(를) 단위 원가당 물성 변화량이 큰 순으로 조정했습니다.'
+           ? `${mko} ${r.steps.length}개 항목을 단위 원가당 물성 변화량이 큰 순으로 조정했습니다.`
            : '규격·조업창 내에 해가 없어 변경하지 않았습니다.')
          +(miss
-           ? ` 규격·조업창 안에서 도달 가능한 한계는 ${f(r.achieved,pm.d)} ${pm.u} 입니다.`
-             +(bindTxt?` ${bindTxt} 이(가) 한계에 닿았습니다.`:'')
-             +(mode==='comp'?' 제조조건 쪽으로 다시 시도하면 조금 더 움직일 수 있습니다.':'')
+           ? ` 목표 ${f(r.target,pm.d)} ${pm.u} 는 ${mko} 조정만으로는 도달하지 못했습니다.`
+             +(mode!=='both'?' [둘 다 변경] 으로 다시 시도하면 더 움직일 수 있습니다.':'')
            : ''),
-         null,
+         list.length?list:null,
          miss?{target:r.target,reach:r.achieved,unit:pm.u,label:pm.n,
-               mode:mode==='comp'?'성분':'제조조건',bind:bindTxt}:null);
+               mode:mko,bind:bindTxt}:null);
     pending=null; render();
     const bay=document.querySelector(`[data-bay="${k}"]`);
     if(bay) bay.querySelector('details.basis').open=true;
@@ -147,17 +148,17 @@ function logInverse(k,r){
     return;
   }
   const body=r.steps.map(s=>{
-    const nm=s.mode==='comp'?s.knob:PR.find(x=>x.k===s.knob).n;
+    const nm=s.name||s.knob;
     return `${nm} ${f(s.from,s.d)} → ${f(s.to,s.d)} ${s.unit} `
       +`(감도 ${sgn(s.sens,Math.abs(s.sens)>10?1:2)} ${meta.u}/${s.unit}, `
       +`${meta.n} ${sgn(s.dP,meta.d)}, 원가 ${sgn(s.dC,1)} $/t)`;
   }).join('<br>');
   const rank=r.sens.slice(0,4).map(s=>{
-    const nm=r.mode==='comp'?s.e:PR.find(x=>x.k===s.e).n;
+    const nm=s.n||s.e;
     return `${nm} ${f(s.eff,2)}`;}).join(' · ');
   const hit=Math.abs(r.achieved-r.target)<Math.abs(r.target)*0.01;
   const rej=(r.rejected||[]).map(x=>{
-    const nm=x.mode==='comp'?x.knob:PR.find(y=>y.k===x.knob).n;
+    const nm=x.name||x.knob;
     return `${nm} → ${f(x.to,x.d)} 기각: ${x.why.join(' / ')}`;}).join('<br>');
   S.log[k].push(head+` <span class="${hit?'up':'dn'}">달성 ${f(r.achieved,meta.d)}</span>`
     +(hit?'':` <span class="dn">— 규격·조업창 내에서 목표 미달</span>`)+`<br>

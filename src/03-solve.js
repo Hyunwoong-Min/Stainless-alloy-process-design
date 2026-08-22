@@ -100,15 +100,20 @@ function trial(k,mode,knob,val){
   return compute(k,c,p,S.prices);
 }
 function knobList(k,mode){
-  if(mode==='comp'){
-    return Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>({e,lo,hi,
-      st:EL.find(x=>x.k===e).s, d:EL.find(x=>x.k===e).d}));
-  }
+  const comp=()=>Object.entries(GRADES[k].knobs).map(([e,[lo,hi]])=>({e,lo,hi,kind:'comp',
+    st:EL.find(x=>x.k===e).s, d:EL.find(x=>x.k===e).d, u:'wt%',
+    n:e}));
   // 공정 노브는 설비 최대범위가 아니라 강종별 야금학적 조업창(pk) 안에서만 움직인다
-  const win=GRADES[k].pk||{};
-  return PROC_KNOBS.map(e=>{const m=PR.find(x=>x.k===e), w=win[e];
-    return {e,lo:w?Math.max(m.min,w[0]):m.min,hi:w?Math.min(m.max,w[1]):m.max,st:m.s,d:m.d};});
+  const proc=()=>{ const win=GRADES[k].pk||{};
+    return PROC_KNOBS.map(e=>{const m=PR.find(x=>x.k===e), w=win[e];
+      return {e,lo:w?Math.max(m.min,w[0]):m.min,hi:w?Math.min(m.max,w[1]):m.max,
+              kind:'proc',st:m.s,d:m.d,u:m.u,n:m.n};});
+  };
+  if(mode==='comp') return comp();
+  if(mode==='proc') return proc();
+  return comp().concat(proc());          // 'both' — 성분과 제조조건을 함께 쓴다
 }
+const MODE_KO={comp:'성분',proc:'제조조건',both:'성분+제조조건'};
 /* 목적물성 prop 을 target 으로 — mode: 'comp' | 'proc'
    1단계: 단위 원가당 효율이 높은 노브부터 이분법으로 접근 (최소원가 우선)
    2단계: 그래도 목표 미달이면 좌표하강으로 도달 가능한 한계치까지 밀어붙이고,
@@ -119,15 +124,19 @@ function solve(k,prop,target,mode){
   const steps=[], knobs=knobList(k,mode), rejected=[];
   const want=Math.sign(target-base);                  // +1 이면 올려야 함
   const tol=Math.abs(target)*0.004;
-  const getv=e=>(mode==="comp"?S.g[k].comp:S.g[k].proc)[e];
-  const orig={}; knobs.forEach(kb=>orig[kb.e]=(mode==="comp"?S.g[k].comp:S.g[k].proc)[kb.e]);
-  const setv=(e,v)=>{ (mode==='comp'?S.g[k].comp:S.g[k].proc)[e]=v; };
+  // 'both' 모드에서는 노브마다 성분/공정이 섞이므로 종류를 노브에서 읽는다
+  const KIND={}; knobs.forEach(kb=>KIND[kb.e]=kb.kind);
+  const bucket=e=>KIND[e]==='comp'?S.g[k].comp:S.g[k].proc;
+  const getv=e=>bucket(e)[e];
+  const setv=(e,v)=>{ bucket(e)[e]=v; };
+  const tri=(e,v)=>trial(k,KIND[e],e,v);
+  const orig={}; knobs.forEach(kb=>orig[kb.e]=getv(kb.e));
 
   // 새 'no' 등급 제약이 생기지 않는 변경만 채택
   const tryMove=(e,v)=>{
     const before=S.res[k], v0=getv(e);
     if(Math.abs(v-v0)<1e-12) return null;
-    const Rn=trial(k,mode,e,v);
+    const Rn=tri(e,v);
     setv(e,v); S.res[k]=Rn;
     const c0=constraints(k,before).filter(x=>x.lv==='no').map(x=>x.id);
     const born=constraints(k,Rn).filter(x=>x.lv==='no'&&!c0.includes(x.id));
@@ -137,10 +146,10 @@ function solve(k,prop,target,mode){
   const record=(kb,v0,to,before,Rn)=>{
     const ex=steps.find(s=>s.knob===kb.e);
     if(ex){ ex.to=to; ex.dP=Rn[prop]-ex.beforeP; ex.dC=Rn.cost.total-ex.beforeC; }
-    else steps.push({knob:kb.e,mode,from:v0,to,d:kb.d,
+    else steps.push({knob:kb.e,mode:kb.kind,name:kb.n,from:v0,to,d:kb.d,
       beforeP:before[prop], beforeC:before.cost.total,
       dP:Rn[prop]-before[prop], dC:Rn.cost.total-before.cost.total,
-      sens:kb.dP, unit:mode==='comp'?'wt%':(PR.find(x=>x.k===kb.e).u)});
+      sens:kb.dP, unit:kb.u});
     S.g[k].solved[kb.e]=1;
   };
 
@@ -153,20 +162,20 @@ function solve(k,prop,target,mode){
     const h=Math.max(kb.st,(kb.hi-kb.lo)/60);
     const vp=Math.min(kb.hi,v0+h), vm=Math.max(kb.lo,v0-h);
     if(vp-vm<1e-12) return null;
-    const Rp=trial(k,mode,kb.e,vp), Rm=trial(k,mode,kb.e,vm);
+    const Rp=tri(kb.e,vp), Rm=tri(kb.e,vm);
     let dP=(Rp[prop]-Rm[prop])/(vp-vm);
     const dC=(Rp.cost.total-Rm.cost.total)/(vp-vm);
     // 전 구간 할선 — 구간 양끝과 중간 몇 점을 보고 최대 변화폭을 잡는다
     let plo=Infinity, phi=-Infinity;
     for(let i=0;i<=8;i++){
-      const pv=trial(k,mode,kb.e,kb.lo+(kb.hi-kb.lo)*i/8)[prop];
+      const pv=tri(kb.e,kb.lo+(kb.hi-kb.lo)*i/8)[prop];
       if(pv<plo) plo=pv; if(pv>phi) phi=pv;
     }
     const span=phi-plo;
     if(!isFinite(dP)) dP=0;
     if(Math.abs(dP)<1e-9){
       if(span<Math.max(1e-6,Math.abs(R0[prop])*0.002)) return null;   // 정말 무관한 노브
-      const pHi=trial(k,mode,kb.e,kb.hi)[prop], pLo=trial(k,mode,kb.e,kb.lo)[prop];
+      const pHi=tri(kb.e,kb.hi)[prop], pLo=tri(kb.e,kb.lo)[prop];
       dP=(pHi-pLo)/(kb.hi-kb.lo);
       if(Math.abs(dP)<1e-9) dP=span/(kb.hi-kb.lo);   // 비단조면 폭으로 대체
     }
@@ -180,7 +189,7 @@ function solve(k,prop,target,mode){
     const dir=Math.sign(target-S.res[k][prop])*Math.sign(kb.dP);
     const lo=dir>0?v0:kb.lo, hi=dir>0?kb.hi:v0;
     if(hi-lo<1e-9) continue;
-    const fn=v=>trial(k,mode,kb.e,v)[prop]-target;
+    const fn=v=>tri(kb.e,v)[prop]-target;
     const flo=fn(lo), fhi=fn(hi);
     let bv;
     if(flo*fhi<=0){ let a=lo,b=hi;
@@ -194,7 +203,7 @@ function solve(k,prop,target,mode){
     if(Math.abs(bv-v0)<1e-12) continue;
     const r=tryMove(kb.e,bv);
     if(!r) continue;
-    if(!r.ok){ rejected.push({knob:kb.e,mode,to:bv,d:kb.d,eff:kb.eff,
+    if(!r.ok){ rejected.push({knob:kb.e,mode:kb.kind,name:kb.n,to:bv,d:kb.d,eff:kb.eff,
                               why:r.born.map(x=>x.txt)}); continue; }
     record(kb,r.v0,bv,r.before,r.Rn);
   }
@@ -230,14 +239,14 @@ function solve(k,prop,target,mode){
         const scan=(lo,hi,n)=>{
           let bv=null,bp=S.res[k][prop];
           for(const v of cands(lo,hi,n)){
-            const R2=trial(k,mode,kb.e,v);
+            const R2=tri(kb.e,v);
             const pv=R2[prop];
             const better = want>0 ? (pv>bp && pv<=target+tol) : (pv<bp && pv>=target-tol);
             if(!better) continue;
             const born=constraints(k,R2).filter(x=>x.lv==='no'&&!baseBad.includes(x.id));
             if(born.length){
               if(!rejected.some(x=>x.knob===kb.e))
-                rejected.push({knob:kb.e,mode,to:v,d:kb.d,eff:kb.eff,
+                rejected.push({knob:kb.e,mode:kb.kind,name:kb.n,to:v,d:kb.d,eff:kb.eff,
                                why:born.map(x=>x.txt)});
               continue;
             }
@@ -279,7 +288,7 @@ function solve(k,prop,target,mode){
         let bv=null, bm=mNow;
         for(let i=0;i<=32;i++){
           const v=cl(Math.round((kb.lo+(kb.hi-kb.lo)*i/32)/kb.st)*kb.st,kb.lo,kb.hi);
-          const R2=trial(k,mode,kb.e,v);
+          const R2=tri(kb.e,v);
           // 목적물성은 거의 유지하되(0.3 % 이내 손실) 규격 여유는 늘리는 수
           const keep = want>0 ? R2[prop]>=pNow-Math.abs(pNow)*0.003
                               : R2[prop]<=pNow+Math.abs(pNow)*0.003;
@@ -301,7 +310,7 @@ function solve(k,prop,target,mode){
           const v0=getv(kb.e); let bv=null,bp=S.res[k][prop];
           for(let i=0;i<=32;i++){
             const v=cl(Math.round((kb.lo+(kb.hi-kb.lo)*i/32)/kb.st)*kb.st,kb.lo,kb.hi);
-            const R2=trial(k,mode,kb.e,v), pv=R2[prop];
+            const R2=tri(kb.e,v), pv=R2[prop];
             const better = want>0 ? (pv>bp && pv<=target+tol) : (pv<bp && pv>=target-tol);
             if(!better) continue;
             if(constraints(k,R2).filter(x=>x.lv==='no'&&!baseBad.includes(x.id)).length) continue;
@@ -324,11 +333,11 @@ function solve(k,prop,target,mode){
     knobs.forEach(kb=>{
       const to=getv(kb.e), from=orig[kb.e];
       if(Math.abs(to-from)<kb.st*0.5) return;
-      const back=trial(k,mode,kb.e,from);
-      steps.push({knob:kb.e,mode,from,to,d:kb.d,
+      const back=tri(kb.e,from);
+      steps.push({knob:kb.e,mode:kb.kind,name:kb.n,from,to,d:kb.d,
         dP:fin[prop]-back[prop], dC:fin.cost.total-back.cost.total,
         sens:(sens.find(s=>s.e===kb.e)||{dP:0}).dP,
-        unit:mode==='comp'?'wt%':(PR.find(x=>x.k===kb.e).u)});
+        unit:kb.u});
       S.g[k].solved[kb.e]=1;
     });
 
@@ -337,7 +346,7 @@ function solve(k,prop,target,mode){
       binding=sens.filter(kb=>{
         const v=getv(kb.e);
         return Math.abs(v-kb.lo)<kb.st*0.6 || Math.abs(v-kb.hi)<kb.st*0.6;
-      }).slice(0,5).map(kb=>({e:kb.e,at:Math.abs(getv(kb.e)-kb.lo)<kb.st*0.6?'하한':'상한',
+      }).slice(0,5).map(kb=>({e:kb.e,name:kb.n,kind:kb.kind,at:Math.abs(getv(kb.e)-kb.lo)<kb.st*0.6?"하한":"상한",
                               lo:kb.lo,hi:kb.hi,d:kb.d}));
     }
   }
