@@ -1,13 +1,14 @@
 /* ══════════════════════════════════════════════════════════════
    4. 상태
    ══════════════════════════════════════════════════════════════ */
-const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},tab:ORDER[0]};
+const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},tab:ORDER[0]};
 function initState(){
   ORDER.forEach(k=>{
-    S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},touched:{},solved:{}};
+    S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},
+              touched:{},solved:{},pend:{}};
     S.log[k]=[];
   });
-  S.thread=[]; S.chg={};
+  S.thread=[]; S.chg={}; S.diff={};
 }
 const calc=k=>compute(k,S.g[k].comp,S.g[k].proc,S.prices);
 function recalc(){ ORDER.forEach(k=>S.res[k]=calc(k)); }
@@ -200,3 +201,37 @@ function niCut(k){
   }
   return best&&best.save>8?best:null;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   6-b. 대기 중인 수정 (여러 항목을 모아 한 번에 반영)
+   ══════════════════════════════════════════════════════════════ */
+const pendCount=k=>Object.keys(S.g[k].pend).length;
+const pendVal=(k,kind,key)=>{
+  const p=S.g[k].pend[kind+':'+key];
+  return p?p.to:(kind==='comp'?S.g[k].comp:S.g[k].proc)[key];
+};
+/* 화면에 표시되는 계산값 전체를 평탄한 맵으로 — 변경 하이라이트 판정용 */
+function outSnap(R){
+  const o={};
+  PROP.forEach(p=>o[p.k]=R[p.k]);
+  ['creq','nieq','dCast','FN','dFin','md30','V30','msA','mu','gmax','kff',
+   'ac1','ac3','msMar','fm','rbar','ridge','d','G','DOS','Ceff','crRed','tCR','pren']
+    .forEach(x=>{ if(typeof R[x]==='number'&&isFinite(R[x])) o[x]=R[x]; });
+  o.costTotal=R.cost.total; o.costAlloy=R.cost.alloy;
+  o.costRefine=R.cost.refine; o.costConv=R.cost.conv;
+  return o;
+}
+/* 표시 자릿수보다 크게 움직인 항목만 up/dn 으로 표시 */
+const DIFF_DEC={EL:1,ic:2,rbar:2,Ceff:4,mu:3,creq:2,nieq:2,kff:2,
+                dFin:2,dCast:1,FN:1,V30:1,ridge:1,d:1,G:1,crRed:1};
+function diffOut(A,B){
+  const a=outSnap(A), b=outSnap(B), d={};
+  Object.keys(b).forEach(kk=>{
+    if(!(kk in a)) return;
+    const dec=DIFF_DEC[kk]!==undefined?DIFF_DEC[kk]:0;
+    const eps=Math.pow(10,-dec)/2;
+    if(Math.abs(b[kk]-a[kk])>=eps) d[kk]=b[kk]>a[kk]?'up':'dn';
+  });
+  return d;
+}
+const dcls=(k,key)=>{ const d=S.diff[k]; return d&&d[key]?' chg-'+d[key]:''; };

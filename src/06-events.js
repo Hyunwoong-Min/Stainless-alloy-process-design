@@ -5,25 +5,41 @@ let bound=false, pending=null;
 function bindBays(){ if(bound) return; bound=true;
   const root=$('#bays');
 
-  // 9-1 제조조건 입력 → 순방향 재계산
+  // 9-1 제조조건 입력 → 즉시 계산하지 않고 대기열에 쌓는다
   root.addEventListener('input',e=>{
     const t=e.target; if(!t.dataset.kind) return;
     const {g:k,kind,key}=t.dataset;
     const v=parseFloat(t.value); if(!isFinite(v)) return;
     const meta=kind==='comp'?EL.find(x=>x.k===key):PR.find(x=>x.k===key);
     const nv=cl(v,meta.min,meta.max);
-    const before=S.res[k]; const prevVal=(kind==="comp"?S.g[k].comp:S.g[k].proc)[key];
-    (kind==='comp'?S.g[k].comp:S.g[k].proc)[key]=nv;
-    S.g[k].touched[key]=1; delete S.g[k].solved[key];
-    recalc();
-    const after=S.res[k];
-    logForward(k,kind,key,meta,before,after);
-    snap(k,kind==="comp"?key:meta.n,prevVal,nv,meta.d,kind==="comp"?"wt%":meta.u,
-         "제조조건 수정 → 물성 재계산",before,after,noteFor(k,kind,key,before,after));
-    t.classList.add('touched');
-    refreshOut();
+    const cur=(kind==='comp'?S.g[k].comp:S.g[k].proc)[key];
+    const pk=kind+':'+key;
+    if(Math.abs(nv-cur)<Math.pow(10,-meta.d)/2){
+      delete S.g[k].pend[pk];                 // 원래 값으로 되돌린 경우
+    }else{
+      S.g[k].pend[pk]={kind,key,from:cur,to:nv,d:meta.d,
+        label:kind==='comp'?key:meta.n, unit:kind==='comp'?'wt%':meta.u, meta};
+    }
+    t.classList.toggle("pending",!!S.g[k].pend[pk]);
+    // 라벨의 규격범위 자리에 반영 전 값을 취소선으로 — 여러 항목을 고칠 때 원래 값을 잊지 않도록
+    const lab=t.closest(".f").querySelector("label i");
+    if(lab){
+      if(S.g[k].pend[pk]) lab.innerHTML=`<u title="반영 전 값">${f(cur,meta.d)}</u>`;
+      else{
+        const sp=kind==="comp"?GRADES[k].spec[key]:null;
+        lab.textContent=sp?`${sp[0]}–${sp[1]===null?"—":sp[1]}`:(meta.u||"");
+      }
+    }
+    refreshBar(k);
   });
 
+  // Enter 로도 반영
+  root.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||!e.target.dataset.kind) return;
+    e.preventDefault();
+    const k=e.target.dataset.g;
+    if(pendCount(k)) applyPending(k);
+  });
   // 9-2 물성 입력 → 역설계 선택지 노출
   root.addEventListener('change',e=>{
     const t=e.target; if(!t.dataset.prop) return;
@@ -43,13 +59,22 @@ function bindBays(){ if(bound) return; bound=true;
     t.closest('.prop').classList.add('tgt');
   });
 
-  // 9-3 선택 처리
+  // 9-3 수정 확인 / 되돌리기
+  root.addEventListener("click",e=>{
+    const a=e.target.closest("[data-apply]");
+    if(a){ applyPending(a.dataset.apply); return; }
+    const r=e.target.closest("[data-revert]");
+    if(r){ S.g[r.dataset.revert].pend={}; render(); return; }
+  });
+
+  // 9-4 역설계 선택 처리
   root.addEventListener('click',e=>{
     const b=e.target.closest('[data-solve]'); if(!b||!pending) return;
     const mode=b.dataset.solve, {k,pk,tgt}=pending;
     if(mode==='cancel'){ pending=null; render(); return; }
     const bIn=S.res[k];
     const r=solve(k,pk,tgt,mode);
+    S.diff[k]=diffOut(bIn,S.res[k]);
     logInverse(k,r);
     snap(k,PROP.find(x=>x.k===pk).n,r.base,r.achieved,PROP.find(x=>x.k===pk).d,
          PROP.find(x=>x.k===pk).u, mode==="comp"?"역설계 · 성분 조정":"역설계 · 제조조건 조정",
@@ -67,8 +92,8 @@ function bindBays(){ if(bound) return; bound=true;
 
 
 /* ── 변경 스냅샷 : 요약 패널의 원본 데이터 ─────────────────── */
-function snap(k,what,from,to,dec,unit,mode,A,B,note){
-  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note};
+function snap(k,what,from,to,dec,unit,mode,A,B,note,items){
+  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note,items:items||null};
 }
 function noteFor(k,kind,key,A,B){
   const R=B;
@@ -98,32 +123,6 @@ function delta(a,b,key,d,u){
   const dv=b-a; if(Math.abs(dv)<Math.pow(10,-d)/2) return '';
   const cls=dv>0?'up':'dn';
   return ` <span class="${cls}">${key} ${sgn(dv,d)}${u}</span>`;
-}
-function logForward(k,kind,key,meta,A,B){
-  const nm=kind==='comp'?key:meta.n, u=kind==='comp'?' wt%':' '+meta.u;
-  let d='';
-  d+=delta(A.YS,B.YS,'YS',0,'');
-  d+=delta(A.TS,B.TS,'TS',0,'');
-  d+=delta(A.EL,B.EL,'EL',1,'');
-  d+=delta(A.HV,B.HV,'HV',0,'');
-  d+=delta(A.Ep,B.Ep,'Ep',0,'mV');
-  d+=delta(A.ic,B.ic,'icrit',2,'');
-  d+=delta(A.cost.total,B.cost.total,'원가',0,'$');
-  if(!d) return;
-  let why='';
-  if(kind==='comp'){
-    const dd=B.d-A.d;
-    why=`<span class="d">경로: ${key} 변화 → `
-      +(B.fam==='austenitic'
-        ? `Nieq ${f(A.nieq,2)}→${f(B.nieq,2)}, Md30 ${f(A.md30,0)}→${f(B.md30,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`
-        : `γmax ${f(A.gmax,0)}→${f(B.gmax,0)} %, Ac1 ${f(A.ac1,0)}→${f(B.ac1,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`)
-      +(Math.abs(dd)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`;
-  }else{
-    why=`<span class="d">경로: ${nm} 변화 → 결정립 ${f(A.d,1)}→${f(B.d,1)} µm (ASTM ${f(A.G,1)}→${f(B.G,1)}), `
-      +`DOS ${f(A.DOS,0)}→${f(B.DOS,0)}`
-      +(A.fm!==B.fm?`, 마르텐사이트 ${f(A.fm*100,0)}→${f(B.fm*100,0)} %`:'')+`</span>`;
-  }
-  S.log[k].push(`<b>${nm} → ${(kind==='comp'?S.g[k].comp:S.g[k].proc)[key]}${u}</b>${d}<br>${why}`);
 }
 function logInverse(k,r){
   const meta=PROP.find(x=>x.k===r.prop);
@@ -196,7 +195,10 @@ function refreshOut(){
    ══════════════════════════════════════════════════════════════ */
 $('#btnReset').onclick=()=>{ initState(); render(); renderSuggest(); renderThread(); };
 $('#btnFix').onclick=()=>{
-  const ap=autoFix(); S.tab=REVIEW_TAB; render();
+  const A0={}; ORDER.forEach(g=>A0[g]=S.res[g]);
+  const ap=autoFix();
+  ORDER.forEach(g=>S.diff[g]=diffOut(A0[g],S.res[g]));
+  S.tab=REVIEW_TAB; render();
   const rv=review();
   ask(rv.pass
     ?`자동 개선 완료 — 페르소나 전원 ${rv.min.toFixed(1)}점 이상 달성`
@@ -213,6 +215,7 @@ $('#btnNi').onclick=()=>{
     Object.keys(nc.c).forEach(e=>{ if(Math.abs(nc.c[e]-S.g[k].comp[e])>1e-9) S.g[k].solved[e]=1; });
     const before=S.res[k]; const prevNi=S.g[k].comp.Ni;
     S.g[k].comp={...nc.c}; recalc();
+    S.diff[k]=diffOut(before,S.res[k]);
     const A=S.res[k];
     S.log[k].push(`<b>Ni 절감 최적화</b> <span class="up">원가 −${f(nc.save,0)} $/t</span><br>
       <span class="d">Ni ${f(before.cost.brk.Ni/10/S.prices.Ni,2)} → ${f(S.g[k].comp.Ni,2)} wt%,
@@ -245,3 +248,57 @@ $('#tabs').addEventListener('click',e=>{
   window.scrollTo({top:$('#tabs').offsetTop-14,
     behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
 });
+
+/* ══════════════════════════════════════════════════════════════
+   9-b. 대기 중인 수정 반영
+   ══════════════════════════════════════════════════════════════ */
+function refreshBar(k){
+  const bay=document.querySelector(`[data-bay="${k}"]`); if(!bay) return;
+  const old=bay.querySelector('.applybar');
+  const html=applyBarHTML(k);
+  if(old){ if(html) old.outerHTML=html; else old.remove(); }
+  else if(html) bay.querySelector('.bay-head').insertAdjacentHTML('afterend',html);
+}
+function applyPending(k){
+  const items=Object.values(S.g[k].pend);
+  if(!items.length) return;
+  const A=S.res[k];
+  items.forEach(p=>{
+    (p.kind==='comp'?S.g[k].comp:S.g[k].proc)[p.key]=p.to;
+    S.g[k].touched[p.key]=1; delete S.g[k].solved[p.key];
+  });
+  recalc();
+  const B=S.res[k];
+  S.diff[k]=diffOut(A,B);                   // 변한 값에 색을 입히기 위한 표식
+  logApply(k,items,A,B);
+  const one=items.length===1?items[0]:null;
+  const list=items.map(p=>({label:p.label,from:p.from,to:p.to,d:p.d,unit:p.unit}));
+  snap(k,
+    one?one.label:`${items.length}개 항목 동시 수정`,
+    one?one.from:null, one?one.to:null, one?one.d:0,
+    one?one.unit:'',
+    one?'제조조건 수정 → 물성 재계산':`제조조건 ${items.length}건 일괄 수정 → 물성 재계산`,
+    A,B,
+    one?noteFor(k,one.kind,one.key,A,B)
+       :'여러 항목을 동시에 바꾸면 각 인자의 기여가 겹칩니다. 아래 야금 경로는 합산 결과이며, '
+        +'개별 기여를 분리해 보려면 한 항목씩 반영하십시오.',
+    one?null:list);
+  S.g[k].pend={};
+  render();
+}
+function logApply(k,items,A,B){
+  let d='';
+  d+=delta(A.YS,B.YS,'YS',0,'');
+  d+=delta(A.TS,B.TS,'TS',0,'');
+  d+=delta(A.EL,B.EL,'EL',1,'');
+  d+=delta(A.HV,B.HV,'HV',0,'');
+  d+=delta(A.Ep,B.Ep,'Ep',0,'mV');
+  d+=delta(A.ic,B.ic,'icrit',2,'');
+  d+=delta(A.cost.total,B.cost.total,'원가',0,'$');
+  const head=items.map(p=>`${p.label} ${f(p.from,p.d)}→${f(p.to,p.d)} ${p.unit}`).join(', ');
+  const why=B.fam==='austenitic'
+    ? `Nieq ${f(A.nieq,2)}→${f(B.nieq,2)}, Md30 ${f(A.md30,0)}→${f(B.md30,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`
+    : `γmax ${f(A.gmax,0)}→${f(B.gmax,0)} %, Ac1 ${f(A.ac1,0)}→${f(B.ac1,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`;
+  S.log[k].push(`<b>${esc(head)}</b>${d}<br><span class="d">경로: ${why}`
+    +(Math.abs(B.d-A.d)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`);
+}

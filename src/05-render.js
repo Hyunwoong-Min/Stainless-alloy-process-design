@@ -162,9 +162,10 @@ function summaryHTML(k){
 
   return `<div class="sumbox">
     <div class="sum-h"><b>변경 요약</b>
-      <span class="sum-what">${esc(c.what)} <span class="num">${f(c.from,c.d)}</span> →
-      <span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}</span>
+      <span class="sum-what">${esc(c.what)}${c.items?"":` <span class="num">${f(c.from,c.d)}</span> →`}
+      ${c.items?"":`<span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}`}</span>
       <span class="sum-mode">${c.mode}</span></div>
+    ${c.items?`<ul class="sum-items">${c.items.map(x=>`<li><b>${esc(x.label)}</b> <span class="num">${f(x.from,x.d)}</span> → <span class="num">${f(x.to,x.d)}</span> ${esc(x.unit)}</li>`).join("")}</ul>`:""}
     <div class="sum-grid">
       <div><div class="sum-t">야금 경로</div>
         ${mid.length?`<ul class="sum-mid">${mid.join('')}</ul>`
@@ -179,12 +180,16 @@ function summaryHTML(k){
 }
 /* ── 8-4 강종 베이 ──────────────────────────────────────────── */
 function fieldHTML(k,kind,m){
-  const st=S.g[k], v=(kind==='comp'?st.comp:st.proc)[m.k];
-  const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':''].join(' ');
+  const st=S.g[k], committed=(kind==='comp'?st.comp:st.proc)[m.k];
+  const pk=kind+':'+m.k, isPend=!!st.pend[pk];
+  const v=isPend?st.pend[pk].to:committed;
+  const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':'',
+             isPend?'pending':''].filter(Boolean).join(' ');
   const spec=kind==='comp'?GRADES[k].spec[m.k]:null;
   const oos=spec&&(v<spec[0]-1e-9||(spec[1]!==null&&v>spec[1]+1e-9))?' oos':'';
   const hint=spec?`${spec[0]}–${spec[1]===null?'—':spec[1]}`:(m.u||'');
-  return `<div class="f"><label>${m.n||m.k}<i>${hint}</i></label>
+  const was=isPend?`<u title="반영 전 값">${f(committed,m.d)}</u>`:'';
+  return `<div class="f"><label>${m.n||m.k}<i>${was||hint}</i></label>
     <input type="number" class="${cls}${oos}" value="${v}" step="${m.s}"
       data-g="${k}" data-kind="${kind}" data-key="${m.k}"
       min="${m.min}" max="${m.max}" aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
@@ -203,8 +208,9 @@ function propHTML(k,g){
       if(p.k==='ic') s=v<2?'부동태화 용이':v<8?'보통':'난부동태';
       c=(p.k==='Ep'?(v>250?'ok':v>120?'hi':'lo'):(v<2?'ok':v<8?'hi':'lo'));
     }
-    return `<div class="prop" data-pk="${p.k}" data-g="${k}">
+    return `<div class="prop${dcls(k,p.k)}" data-pk="${p.k}" data-g="${k}">
       <div class="prop-l"><b>${p.n}</b><span>${p.u}</span></div>
+      ${S.diff[k]&&S.diff[k][p.k]?`<span class="chgtag">${S.diff[k][p.k]==="up"?"▲":"▼"}</span>`:""}
       <input type="number" value="${f(v,p.d)}" step="${p.d?0.1:1}"
         data-g="${k}" data-prop="${p.k}" aria-label="${GRADES[k].label} ${p.n} 목표값">
       <div class="sub"><span class="vs ${c}">${s}</span></div></div>`;
@@ -212,35 +218,37 @@ function propHTML(k,g){
 }
 function idxHTML(k){
   const R=S.res[k], it=[];
-  const add=(a,b,c)=>it.push([a,b,c||'']);
-  add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`);
-  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa');
-  if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa');
+  // dk = 변경 하이라이트용 키 (outSnap 의 필드명)
+  const add=(a,b,c,dk)=>it.push([a,b,c||'',dk||'']);
+  add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`,'','creq');
+  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa','dCast');
+  if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa','FN');
   if(R.fam==='austenitic'){
-    add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa');
-    add('Md30 (Nohara)',f(R.md30,0)+' ℃',Math.abs(R.md30)<=40?'ok':'wa');
-    add('α′ @30 % 변형',f(R.V30,1)+' %');
-    add('Ms',f(R.msA,0)+' ℃');
-    add('비투자율 µr',f(R.mu,3));
+    add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa','dFin');
+    add('Md30 (Nohara)',f(R.md30,0)+' ℃',Math.abs(R.md30)<=40?'ok':'wa','md30');
+    add('α′ @30 % 변형',f(R.V30,1)+' %','','V30');
+    add('Ms',f(R.msA,0)+' ℃','','msA');
+    add('비투자율 µr',f(R.mu,3),'','mu');
   }else{
-    add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'));
-    add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa');
-    add('Ac1 / Ac3',`${f(R.ac1,0)} / ${f(R.ac3,0)} ℃`);
-    add('Ms',f(R.msMar,0)+' ℃');
-    add('마르텐사이트',f(R.fm*100,0)+' %',R.fam==='martensitic'?'':(R.fm>0.02?'wa':'ok'));
+    add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'),'gmax');
+    add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa','kff');
+    add('Ac1 / Ac3',`${f(R.ac1,0)} / ${f(R.ac3,0)} ℃`,'','ac1');
+    add('Ms',f(R.msMar,0)+' ℃','','msMar');
+    add('마르텐사이트',f(R.fm*100,0)+' %',R.fam==='martensitic'?'':(R.fm>0.02?'wa':'ok'),'fm');
     if(R.fam==='ferritic'){
-      add('r̄ 값',f(R.rbar,2),R.rbar>=0.95?'ok':'wa');
-      add('리징지수',f(R.ridge,1)+' /10',R.ridge<=6?'ok':'wa');
+      add('r̄ 값',f(R.rbar,2),R.rbar>=0.95?'ok':'wa','rbar');
+      add('리징지수',f(R.ridge,1)+' /10',R.ridge<=6?'ok':'wa','ridge');
     }
   }
-  add('결정립 d',`${f(R.d,1)} µm`,R.d>=8&&R.d<=45?'ok':'wa');
-  add('ASTM 립도',f(R.G,1));
-  add('예민화 DOS',f(R.DOS,0)+' /100',R.DOS<=30?'ok':'wa');
-  add('유효 C (Ceff)',f(R.Ceff,4)+' %');
-  add('냉간압하율',f(R.crRed,1)+' %',R.crRed>=40&&R.crRed<=92?'ok':'wa');
-  add('소둔 유효시간',f(R.tCR,0)+' s');
-  return `<div class="idx">${it.map(([a,b,c])=>
-    `<div class="ix"><span class="k">${a}</span><span class="v ${c}">${b}</span></div>`).join('')}</div>`;
+  add('결정립 d',`${f(R.d,1)} µm`,R.d>=8&&R.d<=45?'ok':'wa','d');
+  add('ASTM 립도',f(R.G,1),'','G');
+  add('예민화 DOS',f(R.DOS,0)+' /100',R.DOS<=30?'ok':'wa','DOS');
+  add('유효 C (Ceff)',f(R.Ceff,4)+' %','','Ceff');
+  add('냉간압하율',f(R.crRed,1)+' %',R.crRed>=40&&R.crRed<=92?'ok':'wa','crRed');
+  add('소둔 유효시간',f(R.tCR,0)+' s','','tCR');
+  return `<div class="idx">${it.map(([a,b,c,dk])=>
+    `<div class="ix${dk?dcls(k,dk):''}"><span class="k">${a}</span>`
+    +`<span class="v ${c}">${b}</span></div>`).join('')}</div>`;
 }
 function costHTML(k){
   const R=S.res[k], C=R.cost, T=C.total;
@@ -249,7 +257,7 @@ function costHTML(k){
              ['기타',C.brk.Mn+C.brk.Si+C.brk.Ti+C.brk.Nb+C.brk.N+C.brk.Al+C.brk.C],
              ['정련',C.refine],['가공',C.conv]].filter(s=>s[1]>0.5);
   const ref=GRADES[k].refCost, dv=(T-ref)/ref*100;
-  return `<div class="cost-top"><b class="num">${f(T,0)}</b><span>USD / 톤 (냉연 코일)</span>
+  return `<div class="cost-top${dcls(k,"costTotal")}"><b class="num">${f(T,0)}</b><span>USD / 톤 (냉연 코일)</span>
     <span style="margin-left:auto;color:${dv>2?'var(--fail)':'var(--pass)'}">
     벤치마크 ${ref} 대비 ${sgn(dv,1)} %</span></div>
     <div class="cbar">${seg.map(([n,v])=>
@@ -262,6 +270,21 @@ function costHTML(k){
       <div><span>단위 YS당</span><b>${f(T/R.YS,2)}<span class="mini">$/t·MPa</span></b></div>
     </div>`;
 }
+/* 대기 중인 수정을 한 번에 반영하는 바 — 여러 항목을 고친 뒤 확인 */
+function applyBarHTML(k){
+  const n=pendCount(k);
+  if(!n) return '';
+  const list=Object.values(S.g[k].pend).map(p=>
+    `${esc(p.label)} <span class="num">${f(p.from,p.d)}</span>→<span class="num">${f(p.to,p.d)}</span>`
+  ).join(' · ');
+  return `<div class="applybar" data-ab="${k}">
+    <span class="ab-n">수정 ${n}건 대기</span>
+    <span class="ab-list">${list}</span>
+    <button class="btn sm pri" data-apply="${k}">수정 확인</button>
+    <button class="btn sm" data-revert="${k}">되돌리기</button>
+  </div>`;
+}
+
 function bayHTML(k){
   const G=GRADES[k], R=S.res[k], cons=constraints(k,R), ops=operability(k);
   const chips=[];
@@ -276,6 +299,7 @@ function bayHTML(k){
       <div class="bay-id"><b>${G.famKo}</b><span>기준 ${G.label} · ${G.note}</span></div>
       <div class="chips">${chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('')}</div>
     </header>
+    ${applyBarHTML(k)}
     <div class="bay-body">
       <div class="col in">
         <div class="grp"><div class="grp-h"><h3>공정 개요</h3></div>${thermo(k)}</div>

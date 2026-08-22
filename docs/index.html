@@ -136,6 +136,41 @@ table.cmp td .num{font-size:13.5px}
 .tstage span{font-family:var(--mono);font-size:12px;color:var(--ink-2);
   font-variant-numeric:tabular-nums}
 
+
+/* ── pending edits & change highlight ─────── */
+.f input.pending{border-color:var(--edit);background:var(--edit-soft);font-weight:600;
+  box-shadow:inset 3px 0 0 var(--edit)}
+.f label i u{text-decoration:line-through;opacity:.7;font-style:normal}
+.applybar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;
+  background:var(--edit-soft);border-bottom:1px solid var(--edit);
+  position:sticky;top:0;z-index:5}
+.ab-n{font-family:var(--disp);font-size:13px;font-weight:600;letter-spacing:.02em;
+  color:var(--edit);white-space:nowrap}
+.ab-list{flex:1;min-width:180px;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.ab-list .num{font-size:11.5px;font-weight:600;color:var(--ink)}
+.applybar .btn{background:var(--panel)}
+.applybar .btn.pri{background:var(--edit);border-color:var(--edit);color:#fff}
+:root[data-theme="dark"] .applybar .btn.pri,
+:root:not([data-theme="light"]) .applybar .btn.pri{color:#160F22}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]) .applybar .btn.pri{color:#fff}}
+
+/* 방금 바뀐 값 — 오른 값과 내린 값을 구분해 표시 */
+.prop.chg-up,.prop.chg-dn{border-width:2px}
+.prop.chg-up{border-color:var(--pass);background:var(--pass-soft)}
+.prop.chg-dn{border-color:var(--fail);background:var(--fail-soft)}
+.chgtag{position:absolute;top:5px;right:7px;font-size:9px;line-height:1}
+.prop.chg-up .chgtag{color:var(--pass)}
+.prop.chg-dn .chgtag{color:var(--fail)}
+.ix.chg-up,.ix.chg-dn{border-radius:3px;padding-left:5px;padding-right:5px;
+  margin-left:-5px;margin-right:-5px}
+.ix.chg-up{background:var(--pass-soft)}
+.ix.chg-dn{background:var(--fail-soft)}
+.ix.chg-up .v{color:var(--pass)}
+.ix.chg-dn .v{color:var(--fail)}
+.cost-top.chg-up b{color:var(--pass)}
+.cost-top.chg-dn b{color:var(--fail)}
+
 /* ── change summary ───────────────────────── */
 .sumwrap{border-top:1px solid var(--line)}
 .sumbox{padding:14px 16px;background:var(--edit-soft)}
@@ -171,6 +206,8 @@ table.sum-tb .dn{color:var(--fail);font-weight:600}
 .sf.wa{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
 .sf.no{color:var(--fail);border-color:var(--fail);background:var(--fail-soft)}
 .sum-v{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.sum-items{margin:0 0 11px;padding-left:19px;font-size:12.5px;line-height:1.7;color:var(--ink-2)}
+.sum-items b{font-family:var(--disp);color:var(--ink);font-weight:600}
 .sum-note{margin:10px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-2);max-width:78ch}
 
 /* ── review board ─────────────────────────── */
@@ -207,7 +244,7 @@ table.sum-tb .dn{color:var(--fail);font-weight:600}
 .bay-head{display:flex;align-items:center;gap:14px;padding:12px 16px;flex-wrap:wrap;
   border-bottom:1px solid var(--line);background:var(--panel-2)}
 .bay-id{display:flex;align-items:baseline;gap:10px}
-.bay-id b{font-family:var(--disp);font-size:22px;font-weight:600;letter-spacing:.01em}
+.bay-id b{font-family:var(--disp);font-size:22px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
 .bay-id span{font-size:12px;color:var(--ink-2)}
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
 .chip{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.04em;
@@ -850,13 +887,14 @@ function compute(key, comp, proc, prices){
 /* ══════════════════════════════════════════════════════════════
    4. 상태
    ══════════════════════════════════════════════════════════════ */
-const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},tab:ORDER[0]};
+const S={g:{},prices:{...PRICE0},log:{},thread:[],res:{},chg:{},diff:{},tab:ORDER[0]};
 function initState(){
   ORDER.forEach(k=>{
-    S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},touched:{},solved:{}};
+    S.g[k]={comp:{...GRADES[k].comp},proc:{...GRADES[k].proc},
+              touched:{},solved:{},pend:{}};
     S.log[k]=[];
   });
-  S.thread=[]; S.chg={};
+  S.thread=[]; S.chg={}; S.diff={};
 }
 const calc=k=>compute(k,S.g[k].comp,S.g[k].proc,S.prices);
 function recalc(){ ORDER.forEach(k=>S.res[k]=calc(k)); }
@@ -1049,6 +1087,40 @@ function niCut(k){
   }
   return best&&best.save>8?best:null;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   6-b. 대기 중인 수정 (여러 항목을 모아 한 번에 반영)
+   ══════════════════════════════════════════════════════════════ */
+const pendCount=k=>Object.keys(S.g[k].pend).length;
+const pendVal=(k,kind,key)=>{
+  const p=S.g[k].pend[kind+':'+key];
+  return p?p.to:(kind==='comp'?S.g[k].comp:S.g[k].proc)[key];
+};
+/* 화면에 표시되는 계산값 전체를 평탄한 맵으로 — 변경 하이라이트 판정용 */
+function outSnap(R){
+  const o={};
+  PROP.forEach(p=>o[p.k]=R[p.k]);
+  ['creq','nieq','dCast','FN','dFin','md30','V30','msA','mu','gmax','kff',
+   'ac1','ac3','msMar','fm','rbar','ridge','d','G','DOS','Ceff','crRed','tCR','pren']
+    .forEach(x=>{ if(typeof R[x]==='number'&&isFinite(R[x])) o[x]=R[x]; });
+  o.costTotal=R.cost.total; o.costAlloy=R.cost.alloy;
+  o.costRefine=R.cost.refine; o.costConv=R.cost.conv;
+  return o;
+}
+/* 표시 자릿수보다 크게 움직인 항목만 up/dn 으로 표시 */
+const DIFF_DEC={EL:1,ic:2,rbar:2,Ceff:4,mu:3,creq:2,nieq:2,kff:2,
+                dFin:2,dCast:1,FN:1,V30:1,ridge:1,d:1,G:1,crRed:1};
+function diffOut(A,B){
+  const a=outSnap(A), b=outSnap(B), d={};
+  Object.keys(b).forEach(kk=>{
+    if(!(kk in a)) return;
+    const dec=DIFF_DEC[kk]!==undefined?DIFF_DEC[kk]:0;
+    const eps=Math.pow(10,-dec)/2;
+    if(Math.abs(b[kk]-a[kk])>=eps) d[kk]=b[kk]>a[kk]?'up':'dn';
+  });
+  return d;
+}
+const dcls=(k,key)=>{ const d=S.diff[k]; return d&&d[key]?' chg-'+d[key]:''; };
 /* ══════════════════════════════════════════════════════════════
    7. 페르소나 검증 (10점 만점, 전원 9점 이상이어야 설계 확정)
    ══════════════════════════════════════════════════════════════ */
@@ -1339,9 +1411,10 @@ function summaryHTML(k){
 
   return `<div class="sumbox">
     <div class="sum-h"><b>변경 요약</b>
-      <span class="sum-what">${esc(c.what)} <span class="num">${f(c.from,c.d)}</span> →
-      <span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}</span>
+      <span class="sum-what">${esc(c.what)}${c.items?"":` <span class="num">${f(c.from,c.d)}</span> →`}
+      ${c.items?"":`<span class="num">${f(c.to,c.d)}</span> ${esc(c.unit)}`}</span>
       <span class="sum-mode">${c.mode}</span></div>
+    ${c.items?`<ul class="sum-items">${c.items.map(x=>`<li><b>${esc(x.label)}</b> <span class="num">${f(x.from,x.d)}</span> → <span class="num">${f(x.to,x.d)}</span> ${esc(x.unit)}</li>`).join("")}</ul>`:""}
     <div class="sum-grid">
       <div><div class="sum-t">야금 경로</div>
         ${mid.length?`<ul class="sum-mid">${mid.join('')}</ul>`
@@ -1356,12 +1429,16 @@ function summaryHTML(k){
 }
 /* ── 8-4 강종 베이 ──────────────────────────────────────────── */
 function fieldHTML(k,kind,m){
-  const st=S.g[k], v=(kind==='comp'?st.comp:st.proc)[m.k];
-  const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':''].join(' ');
+  const st=S.g[k], committed=(kind==='comp'?st.comp:st.proc)[m.k];
+  const pk=kind+':'+m.k, isPend=!!st.pend[pk];
+  const v=isPend?st.pend[pk].to:committed;
+  const cls=[st.touched[m.k]?'touched':'',st.solved[m.k]?'solved':'',
+             isPend?'pending':''].filter(Boolean).join(' ');
   const spec=kind==='comp'?GRADES[k].spec[m.k]:null;
   const oos=spec&&(v<spec[0]-1e-9||(spec[1]!==null&&v>spec[1]+1e-9))?' oos':'';
   const hint=spec?`${spec[0]}–${spec[1]===null?'—':spec[1]}`:(m.u||'');
-  return `<div class="f"><label>${m.n||m.k}<i>${hint}</i></label>
+  const was=isPend?`<u title="반영 전 값">${f(committed,m.d)}</u>`:'';
+  return `<div class="f"><label>${m.n||m.k}<i>${was||hint}</i></label>
     <input type="number" class="${cls}${oos}" value="${v}" step="${m.s}"
       data-g="${k}" data-kind="${kind}" data-key="${m.k}"
       min="${m.min}" max="${m.max}" aria-label="${GRADES[k].label} ${m.n||m.k}"></div>`;
@@ -1380,8 +1457,9 @@ function propHTML(k,g){
       if(p.k==='ic') s=v<2?'부동태화 용이':v<8?'보통':'난부동태';
       c=(p.k==='Ep'?(v>250?'ok':v>120?'hi':'lo'):(v<2?'ok':v<8?'hi':'lo'));
     }
-    return `<div class="prop" data-pk="${p.k}" data-g="${k}">
+    return `<div class="prop${dcls(k,p.k)}" data-pk="${p.k}" data-g="${k}">
       <div class="prop-l"><b>${p.n}</b><span>${p.u}</span></div>
+      ${S.diff[k]&&S.diff[k][p.k]?`<span class="chgtag">${S.diff[k][p.k]==="up"?"▲":"▼"}</span>`:""}
       <input type="number" value="${f(v,p.d)}" step="${p.d?0.1:1}"
         data-g="${k}" data-prop="${p.k}" aria-label="${GRADES[k].label} ${p.n} 목표값">
       <div class="sub"><span class="vs ${c}">${s}</span></div></div>`;
@@ -1389,35 +1467,37 @@ function propHTML(k,g){
 }
 function idxHTML(k){
   const R=S.res[k], it=[];
-  const add=(a,b,c)=>it.push([a,b,c||'']);
-  add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`);
-  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa');
-  if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa');
+  // dk = 변경 하이라이트용 키 (outSnap 의 필드명)
+  const add=(a,b,c,dk)=>it.push([a,b,c||'',dk||'']);
+  add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`,'','creq');
+  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa','dCast');
+  if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa','FN');
   if(R.fam==='austenitic'){
-    add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa');
-    add('Md30 (Nohara)',f(R.md30,0)+' ℃',Math.abs(R.md30)<=40?'ok':'wa');
-    add('α′ @30 % 변형',f(R.V30,1)+' %');
-    add('Ms',f(R.msA,0)+' ℃');
-    add('비투자율 µr',f(R.mu,3));
+    add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa','dFin');
+    add('Md30 (Nohara)',f(R.md30,0)+' ℃',Math.abs(R.md30)<=40?'ok':'wa','md30');
+    add('α′ @30 % 변형',f(R.V30,1)+' %','','V30');
+    add('Ms',f(R.msA,0)+' ℃','','msA');
+    add('비투자율 µr',f(R.mu,3),'','mu');
   }else{
-    add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'));
-    add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa');
-    add('Ac1 / Ac3',`${f(R.ac1,0)} / ${f(R.ac3,0)} ℃`);
-    add('Ms',f(R.msMar,0)+' ℃');
-    add('마르텐사이트',f(R.fm*100,0)+' %',R.fam==='martensitic'?'':(R.fm>0.02?'wa':'ok'));
+    add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'),'gmax');
+    add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa','kff');
+    add('Ac1 / Ac3',`${f(R.ac1,0)} / ${f(R.ac3,0)} ℃`,'','ac1');
+    add('Ms',f(R.msMar,0)+' ℃','','msMar');
+    add('마르텐사이트',f(R.fm*100,0)+' %',R.fam==='martensitic'?'':(R.fm>0.02?'wa':'ok'),'fm');
     if(R.fam==='ferritic'){
-      add('r̄ 값',f(R.rbar,2),R.rbar>=0.95?'ok':'wa');
-      add('리징지수',f(R.ridge,1)+' /10',R.ridge<=6?'ok':'wa');
+      add('r̄ 값',f(R.rbar,2),R.rbar>=0.95?'ok':'wa','rbar');
+      add('리징지수',f(R.ridge,1)+' /10',R.ridge<=6?'ok':'wa','ridge');
     }
   }
-  add('결정립 d',`${f(R.d,1)} µm`,R.d>=8&&R.d<=45?'ok':'wa');
-  add('ASTM 립도',f(R.G,1));
-  add('예민화 DOS',f(R.DOS,0)+' /100',R.DOS<=30?'ok':'wa');
-  add('유효 C (Ceff)',f(R.Ceff,4)+' %');
-  add('냉간압하율',f(R.crRed,1)+' %',R.crRed>=40&&R.crRed<=92?'ok':'wa');
-  add('소둔 유효시간',f(R.tCR,0)+' s');
-  return `<div class="idx">${it.map(([a,b,c])=>
-    `<div class="ix"><span class="k">${a}</span><span class="v ${c}">${b}</span></div>`).join('')}</div>`;
+  add('결정립 d',`${f(R.d,1)} µm`,R.d>=8&&R.d<=45?'ok':'wa','d');
+  add('ASTM 립도',f(R.G,1),'','G');
+  add('예민화 DOS',f(R.DOS,0)+' /100',R.DOS<=30?'ok':'wa','DOS');
+  add('유효 C (Ceff)',f(R.Ceff,4)+' %','','Ceff');
+  add('냉간압하율',f(R.crRed,1)+' %',R.crRed>=40&&R.crRed<=92?'ok':'wa','crRed');
+  add('소둔 유효시간',f(R.tCR,0)+' s','','tCR');
+  return `<div class="idx">${it.map(([a,b,c,dk])=>
+    `<div class="ix${dk?dcls(k,dk):''}"><span class="k">${a}</span>`
+    +`<span class="v ${c}">${b}</span></div>`).join('')}</div>`;
 }
 function costHTML(k){
   const R=S.res[k], C=R.cost, T=C.total;
@@ -1426,7 +1506,7 @@ function costHTML(k){
              ['기타',C.brk.Mn+C.brk.Si+C.brk.Ti+C.brk.Nb+C.brk.N+C.brk.Al+C.brk.C],
              ['정련',C.refine],['가공',C.conv]].filter(s=>s[1]>0.5);
   const ref=GRADES[k].refCost, dv=(T-ref)/ref*100;
-  return `<div class="cost-top"><b class="num">${f(T,0)}</b><span>USD / 톤 (냉연 코일)</span>
+  return `<div class="cost-top${dcls(k,"costTotal")}"><b class="num">${f(T,0)}</b><span>USD / 톤 (냉연 코일)</span>
     <span style="margin-left:auto;color:${dv>2?'var(--fail)':'var(--pass)'}">
     벤치마크 ${ref} 대비 ${sgn(dv,1)} %</span></div>
     <div class="cbar">${seg.map(([n,v])=>
@@ -1439,6 +1519,21 @@ function costHTML(k){
       <div><span>단위 YS당</span><b>${f(T/R.YS,2)}<span class="mini">$/t·MPa</span></b></div>
     </div>`;
 }
+/* 대기 중인 수정을 한 번에 반영하는 바 — 여러 항목을 고친 뒤 확인 */
+function applyBarHTML(k){
+  const n=pendCount(k);
+  if(!n) return '';
+  const list=Object.values(S.g[k].pend).map(p=>
+    `${esc(p.label)} <span class="num">${f(p.from,p.d)}</span>→<span class="num">${f(p.to,p.d)}</span>`
+  ).join(' · ');
+  return `<div class="applybar" data-ab="${k}">
+    <span class="ab-n">수정 ${n}건 대기</span>
+    <span class="ab-list">${list}</span>
+    <button class="btn sm pri" data-apply="${k}">수정 확인</button>
+    <button class="btn sm" data-revert="${k}">되돌리기</button>
+  </div>`;
+}
+
 function bayHTML(k){
   const G=GRADES[k], R=S.res[k], cons=constraints(k,R), ops=operability(k);
   const chips=[];
@@ -1453,6 +1548,7 @@ function bayHTML(k){
       <div class="bay-id"><b>${G.famKo}</b><span>기준 ${G.label} · ${G.note}</span></div>
       <div class="chips">${chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('')}</div>
     </header>
+    ${applyBarHTML(k)}
     <div class="bay-body">
       <div class="col in">
         <div class="grp"><div class="grp-h"><h3>공정 개요</h3></div>${thermo(k)}</div>
@@ -1505,25 +1601,41 @@ let bound=false, pending=null;
 function bindBays(){ if(bound) return; bound=true;
   const root=$('#bays');
 
-  // 9-1 제조조건 입력 → 순방향 재계산
+  // 9-1 제조조건 입력 → 즉시 계산하지 않고 대기열에 쌓는다
   root.addEventListener('input',e=>{
     const t=e.target; if(!t.dataset.kind) return;
     const {g:k,kind,key}=t.dataset;
     const v=parseFloat(t.value); if(!isFinite(v)) return;
     const meta=kind==='comp'?EL.find(x=>x.k===key):PR.find(x=>x.k===key);
     const nv=cl(v,meta.min,meta.max);
-    const before=S.res[k]; const prevVal=(kind==="comp"?S.g[k].comp:S.g[k].proc)[key];
-    (kind==='comp'?S.g[k].comp:S.g[k].proc)[key]=nv;
-    S.g[k].touched[key]=1; delete S.g[k].solved[key];
-    recalc();
-    const after=S.res[k];
-    logForward(k,kind,key,meta,before,after);
-    snap(k,kind==="comp"?key:meta.n,prevVal,nv,meta.d,kind==="comp"?"wt%":meta.u,
-         "제조조건 수정 → 물성 재계산",before,after,noteFor(k,kind,key,before,after));
-    t.classList.add('touched');
-    refreshOut();
+    const cur=(kind==='comp'?S.g[k].comp:S.g[k].proc)[key];
+    const pk=kind+':'+key;
+    if(Math.abs(nv-cur)<Math.pow(10,-meta.d)/2){
+      delete S.g[k].pend[pk];                 // 원래 값으로 되돌린 경우
+    }else{
+      S.g[k].pend[pk]={kind,key,from:cur,to:nv,d:meta.d,
+        label:kind==='comp'?key:meta.n, unit:kind==='comp'?'wt%':meta.u, meta};
+    }
+    t.classList.toggle("pending",!!S.g[k].pend[pk]);
+    // 라벨의 규격범위 자리에 반영 전 값을 취소선으로 — 여러 항목을 고칠 때 원래 값을 잊지 않도록
+    const lab=t.closest(".f").querySelector("label i");
+    if(lab){
+      if(S.g[k].pend[pk]) lab.innerHTML=`<u title="반영 전 값">${f(cur,meta.d)}</u>`;
+      else{
+        const sp=kind==="comp"?GRADES[k].spec[key]:null;
+        lab.textContent=sp?`${sp[0]}–${sp[1]===null?"—":sp[1]}`:(meta.u||"");
+      }
+    }
+    refreshBar(k);
   });
 
+  // Enter 로도 반영
+  root.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||!e.target.dataset.kind) return;
+    e.preventDefault();
+    const k=e.target.dataset.g;
+    if(pendCount(k)) applyPending(k);
+  });
   // 9-2 물성 입력 → 역설계 선택지 노출
   root.addEventListener('change',e=>{
     const t=e.target; if(!t.dataset.prop) return;
@@ -1543,13 +1655,22 @@ function bindBays(){ if(bound) return; bound=true;
     t.closest('.prop').classList.add('tgt');
   });
 
-  // 9-3 선택 처리
+  // 9-3 수정 확인 / 되돌리기
+  root.addEventListener("click",e=>{
+    const a=e.target.closest("[data-apply]");
+    if(a){ applyPending(a.dataset.apply); return; }
+    const r=e.target.closest("[data-revert]");
+    if(r){ S.g[r.dataset.revert].pend={}; render(); return; }
+  });
+
+  // 9-4 역설계 선택 처리
   root.addEventListener('click',e=>{
     const b=e.target.closest('[data-solve]'); if(!b||!pending) return;
     const mode=b.dataset.solve, {k,pk,tgt}=pending;
     if(mode==='cancel'){ pending=null; render(); return; }
     const bIn=S.res[k];
     const r=solve(k,pk,tgt,mode);
+    S.diff[k]=diffOut(bIn,S.res[k]);
     logInverse(k,r);
     snap(k,PROP.find(x=>x.k===pk).n,r.base,r.achieved,PROP.find(x=>x.k===pk).d,
          PROP.find(x=>x.k===pk).u, mode==="comp"?"역설계 · 성분 조정":"역설계 · 제조조건 조정",
@@ -1567,8 +1688,8 @@ function bindBays(){ if(bound) return; bound=true;
 
 
 /* ── 변경 스냅샷 : 요약 패널의 원본 데이터 ─────────────────── */
-function snap(k,what,from,to,dec,unit,mode,A,B,note){
-  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note};
+function snap(k,what,from,to,dec,unit,mode,A,B,note,items){
+  S.chg[k]={what,from,to,d:dec,unit,mode,A,B,note,items:items||null};
 }
 function noteFor(k,kind,key,A,B){
   const R=B;
@@ -1598,32 +1719,6 @@ function delta(a,b,key,d,u){
   const dv=b-a; if(Math.abs(dv)<Math.pow(10,-d)/2) return '';
   const cls=dv>0?'up':'dn';
   return ` <span class="${cls}">${key} ${sgn(dv,d)}${u}</span>`;
-}
-function logForward(k,kind,key,meta,A,B){
-  const nm=kind==='comp'?key:meta.n, u=kind==='comp'?' wt%':' '+meta.u;
-  let d='';
-  d+=delta(A.YS,B.YS,'YS',0,'');
-  d+=delta(A.TS,B.TS,'TS',0,'');
-  d+=delta(A.EL,B.EL,'EL',1,'');
-  d+=delta(A.HV,B.HV,'HV',0,'');
-  d+=delta(A.Ep,B.Ep,'Ep',0,'mV');
-  d+=delta(A.ic,B.ic,'icrit',2,'');
-  d+=delta(A.cost.total,B.cost.total,'원가',0,'$');
-  if(!d) return;
-  let why='';
-  if(kind==='comp'){
-    const dd=B.d-A.d;
-    why=`<span class="d">경로: ${key} 변화 → `
-      +(B.fam==='austenitic'
-        ? `Nieq ${f(A.nieq,2)}→${f(B.nieq,2)}, Md30 ${f(A.md30,0)}→${f(B.md30,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`
-        : `γmax ${f(A.gmax,0)}→${f(B.gmax,0)} %, Ac1 ${f(A.ac1,0)}→${f(B.ac1,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`)
-      +(Math.abs(dd)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`;
-  }else{
-    why=`<span class="d">경로: ${nm} 변화 → 결정립 ${f(A.d,1)}→${f(B.d,1)} µm (ASTM ${f(A.G,1)}→${f(B.G,1)}), `
-      +`DOS ${f(A.DOS,0)}→${f(B.DOS,0)}`
-      +(A.fm!==B.fm?`, 마르텐사이트 ${f(A.fm*100,0)}→${f(B.fm*100,0)} %`:'')+`</span>`;
-  }
-  S.log[k].push(`<b>${nm} → ${(kind==='comp'?S.g[k].comp:S.g[k].proc)[key]}${u}</b>${d}<br>${why}`);
 }
 function logInverse(k,r){
   const meta=PROP.find(x=>x.k===r.prop);
@@ -1696,7 +1791,10 @@ function refreshOut(){
    ══════════════════════════════════════════════════════════════ */
 $('#btnReset').onclick=()=>{ initState(); render(); renderSuggest(); renderThread(); };
 $('#btnFix').onclick=()=>{
-  const ap=autoFix(); S.tab=REVIEW_TAB; render();
+  const A0={}; ORDER.forEach(g=>A0[g]=S.res[g]);
+  const ap=autoFix();
+  ORDER.forEach(g=>S.diff[g]=diffOut(A0[g],S.res[g]));
+  S.tab=REVIEW_TAB; render();
   const rv=review();
   ask(rv.pass
     ?`자동 개선 완료 — 페르소나 전원 ${rv.min.toFixed(1)}점 이상 달성`
@@ -1713,6 +1811,7 @@ $('#btnNi').onclick=()=>{
     Object.keys(nc.c).forEach(e=>{ if(Math.abs(nc.c[e]-S.g[k].comp[e])>1e-9) S.g[k].solved[e]=1; });
     const before=S.res[k]; const prevNi=S.g[k].comp.Ni;
     S.g[k].comp={...nc.c}; recalc();
+    S.diff[k]=diffOut(before,S.res[k]);
     const A=S.res[k];
     S.log[k].push(`<b>Ni 절감 최적화</b> <span class="up">원가 −${f(nc.save,0)} $/t</span><br>
       <span class="d">Ni ${f(before.cost.brk.Ni/10/S.prices.Ni,2)} → ${f(S.g[k].comp.Ni,2)} wt%,
@@ -1745,6 +1844,60 @@ $('#tabs').addEventListener('click',e=>{
   window.scrollTo({top:$('#tabs').offsetTop-14,
     behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
 });
+
+/* ══════════════════════════════════════════════════════════════
+   9-b. 대기 중인 수정 반영
+   ══════════════════════════════════════════════════════════════ */
+function refreshBar(k){
+  const bay=document.querySelector(`[data-bay="${k}"]`); if(!bay) return;
+  const old=bay.querySelector('.applybar');
+  const html=applyBarHTML(k);
+  if(old){ if(html) old.outerHTML=html; else old.remove(); }
+  else if(html) bay.querySelector('.bay-head').insertAdjacentHTML('afterend',html);
+}
+function applyPending(k){
+  const items=Object.values(S.g[k].pend);
+  if(!items.length) return;
+  const A=S.res[k];
+  items.forEach(p=>{
+    (p.kind==='comp'?S.g[k].comp:S.g[k].proc)[p.key]=p.to;
+    S.g[k].touched[p.key]=1; delete S.g[k].solved[p.key];
+  });
+  recalc();
+  const B=S.res[k];
+  S.diff[k]=diffOut(A,B);                   // 변한 값에 색을 입히기 위한 표식
+  logApply(k,items,A,B);
+  const one=items.length===1?items[0]:null;
+  const list=items.map(p=>({label:p.label,from:p.from,to:p.to,d:p.d,unit:p.unit}));
+  snap(k,
+    one?one.label:`${items.length}개 항목 동시 수정`,
+    one?one.from:null, one?one.to:null, one?one.d:0,
+    one?one.unit:'',
+    one?'제조조건 수정 → 물성 재계산':`제조조건 ${items.length}건 일괄 수정 → 물성 재계산`,
+    A,B,
+    one?noteFor(k,one.kind,one.key,A,B)
+       :'여러 항목을 동시에 바꾸면 각 인자의 기여가 겹칩니다. 아래 야금 경로는 합산 결과이며, '
+        +'개별 기여를 분리해 보려면 한 항목씩 반영하십시오.',
+    one?null:list);
+  S.g[k].pend={};
+  render();
+}
+function logApply(k,items,A,B){
+  let d='';
+  d+=delta(A.YS,B.YS,'YS',0,'');
+  d+=delta(A.TS,B.TS,'TS',0,'');
+  d+=delta(A.EL,B.EL,'EL',1,'');
+  d+=delta(A.HV,B.HV,'HV',0,'');
+  d+=delta(A.Ep,B.Ep,'Ep',0,'mV');
+  d+=delta(A.ic,B.ic,'icrit',2,'');
+  d+=delta(A.cost.total,B.cost.total,'원가',0,'$');
+  const head=items.map(p=>`${p.label} ${f(p.from,p.d)}→${f(p.to,p.d)} ${p.unit}`).join(', ');
+  const why=B.fam==='austenitic'
+    ? `Nieq ${f(A.nieq,2)}→${f(B.nieq,2)}, Md30 ${f(A.md30,0)}→${f(B.md30,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`
+    : `γmax ${f(A.gmax,0)}→${f(B.gmax,0)} %, Ac1 ${f(A.ac1,0)}→${f(B.ac1,0)} ℃, PREN ${f(A.pren,1)}→${f(B.pren,1)}`;
+  S.log[k].push(`<b>${esc(head)}</b>${d}<br><span class="d">경로: ${why}`
+    +(Math.abs(B.d-A.d)>0.2?`, 결정립 ${f(A.d,1)}→${f(B.d,1)} µm`:'')+`</span>`);
+}
 /* ══════════════════════════════════════════════════════════════
    11. 원료 단가 패널
    ══════════════════════════════════════════════════════════════ */

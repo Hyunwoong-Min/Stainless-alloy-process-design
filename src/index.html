@@ -136,6 +136,41 @@ table.cmp td .num{font-size:13.5px}
 .tstage span{font-family:var(--mono);font-size:12px;color:var(--ink-2);
   font-variant-numeric:tabular-nums}
 
+
+/* ── pending edits & change highlight ─────── */
+.f input.pending{border-color:var(--edit);background:var(--edit-soft);font-weight:600;
+  box-shadow:inset 3px 0 0 var(--edit)}
+.f label i u{text-decoration:line-through;opacity:.7;font-style:normal}
+.applybar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;
+  background:var(--edit-soft);border-bottom:1px solid var(--edit);
+  position:sticky;top:0;z-index:5}
+.ab-n{font-family:var(--disp);font-size:13px;font-weight:600;letter-spacing:.02em;
+  color:var(--edit);white-space:nowrap}
+.ab-list{flex:1;min-width:180px;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.ab-list .num{font-size:11.5px;font-weight:600;color:var(--ink)}
+.applybar .btn{background:var(--panel)}
+.applybar .btn.pri{background:var(--edit);border-color:var(--edit);color:#fff}
+:root[data-theme="dark"] .applybar .btn.pri,
+:root:not([data-theme="light"]) .applybar .btn.pri{color:#160F22}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]) .applybar .btn.pri{color:#fff}}
+
+/* 방금 바뀐 값 — 오른 값과 내린 값을 구분해 표시 */
+.prop.chg-up,.prop.chg-dn{border-width:2px}
+.prop.chg-up{border-color:var(--pass);background:var(--pass-soft)}
+.prop.chg-dn{border-color:var(--fail);background:var(--fail-soft)}
+.chgtag{position:absolute;top:5px;right:7px;font-size:9px;line-height:1}
+.prop.chg-up .chgtag{color:var(--pass)}
+.prop.chg-dn .chgtag{color:var(--fail)}
+.ix.chg-up,.ix.chg-dn{border-radius:3px;padding-left:5px;padding-right:5px;
+  margin-left:-5px;margin-right:-5px}
+.ix.chg-up{background:var(--pass-soft)}
+.ix.chg-dn{background:var(--fail-soft)}
+.ix.chg-up .v{color:var(--pass)}
+.ix.chg-dn .v{color:var(--fail)}
+.cost-top.chg-up b{color:var(--pass)}
+.cost-top.chg-dn b{color:var(--fail)}
+
 /* ── change summary ───────────────────────── */
 .sumwrap{border-top:1px solid var(--line)}
 .sumbox{padding:14px 16px;background:var(--edit-soft)}
@@ -171,6 +206,8 @@ table.sum-tb .dn{color:var(--fail);font-weight:600}
 .sf.wa{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
 .sf.no{color:var(--fail);border-color:var(--fail);background:var(--fail-soft)}
 .sum-v{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.sum-items{margin:0 0 11px;padding-left:19px;font-size:12.5px;line-height:1.7;color:var(--ink-2)}
+.sum-items b{font-family:var(--disp);color:var(--ink);font-weight:600}
 .sum-note{margin:10px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-2);max-width:78ch}
 
 /* ── review board ─────────────────────────── */
@@ -207,7 +244,7 @@ table.sum-tb .dn{color:var(--fail);font-weight:600}
 .bay-head{display:flex;align-items:center;gap:14px;padding:12px 16px;flex-wrap:wrap;
   border-bottom:1px solid var(--line);background:var(--panel-2)}
 .bay-id{display:flex;align-items:baseline;gap:10px}
-.bay-id b{font-family:var(--disp);font-size:22px;font-weight:600;letter-spacing:.01em}
+.bay-id b{font-family:var(--disp);font-size:22px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
 .bay-id span{font-size:12px;color:var(--ink-2)}
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
 .chip{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.04em;
