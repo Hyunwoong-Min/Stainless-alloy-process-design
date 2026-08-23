@@ -22,6 +22,7 @@ function renderPrices(){
    ══════════════════════════════════════════════════════════════ */
 function which(q){
   for(const k of ORDER) if(q.includes(k)) return k;
+  if(/duplex|이중상|2205|2507|2304|2101/i.test(q)) return '2205';
   if(/fully.?ferrite|완전\s*페라이트|풀\s*페라이트/i.test(q)) return '439';
   if(/semi.?ferrite|반\s*페라이트|세미/i.test(q)) return '430';
   if(/austenit|오스테나이트|300계/i.test(q)) return '304';
@@ -33,6 +34,32 @@ const tbl=(head,rows)=>`<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join(''
   <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
 const INTENTS=[
+ {kw:['duplex','이중상','상분율','페라이트분율','시그마','σ상','sigma','2205','2507'],
+  fn:(q,k)=>{k=(k&&S.res[k].fam==='duplex')?k:'2205';const R=S.res[k],c=S.g[k].comp,p=S.g[k].proc;
+   return `<p><b>${GRADES[k].famKo}</b>(기준 ${GRADES[k].label})는 페라이트와 오스테나이트가 절반씩인 이중상입니다.
+   두 상의 분율과 σ상 석출이 물성·내식성을 동시에 지배합니다.</p>
+   <pre>Creq = Cr+1.5Si+Mo+2Nb+3Ti          = ${creqD(c).toFixed(2)}
+Nieq = Ni+22C+18N+0.4Mn+0.5Cu       = ${nieqD(c).toFixed(2)}
+α% = 50 + 3.0·(Creq − Nieq − 16.5) + 0.18·(T − 1060)</pre>
+   ${tbl(['온도','용도','페라이트 %','판정'],[
+     [p.crAnnT+' ℃','최종 용체화',f(R.aF,1),R.aF>=40&&R.aF<=60?'적정 (40~60)':'불균형'],
+     [p.rhfT+' ℃','열간압연역',f(R.aFhot,1),R.aFhot>=40&&R.aFhot<=80?'가공 가능':'열간연성 저하'],
+     ['1060 ℃','설계 기준점',f(ferriteD(c,1060),1),'—']])}
+   <p>상분율은 <b>소둔온도에 0.18 %/℃</b> 로 반응합니다. ${p.crAnnT} ℃ 를 ±30 ℃ 움직이면
+   ${f(ferriteD(c,p.crAnnT-30),1)} ~ ${f(ferriteD(c,p.crAnnT+30),1)} % 로 변합니다.
+   성분 쪽에서는 Cr·Mo 가 페라이트를, Ni·N·Mn 이 오스테나이트를 늘립니다
+   (N 은 계수 18 로 가장 강력하면서 값도 쌉니다).</p>
+   <pre>σeq = Cr + 4.5Mo + 1.5Si            = ${f(R.sigEq,1)}
+log₁₀ t_nose[s] = 8.3 − 0.155·σeq   → ${f(R.sigNose,0)} s (850 ℃)
+1000→600 ℃ 통과 ${f(R.tSig,1)} s , 권취 ${p.ct} ℃  → σ상 ${f(R.sig,2)} %</pre>
+   <p>σ상은 600~1000 ℃ 에서 석출해 <b>취화와 Cr 결핍을 동시에</b> 일으킵니다.
+   ${R.sig<=1?`현재 통과시간이 노즈의 ${f(R.tSig/R.sigNose*100,0)} % 라 실질적으로 석출하지 않습니다.`
+     :`현재 ${f(R.sig,1)} % 로 연신 ${f(-0.35*R.sig,1)} %p, Epit ${f(-5*R.sig,0)} mV 손실이 발생합니다. 냉각을 더 빠르게 하십시오.`}
+   Mo 가 σeq 에 4.5 배로 들어가므로 <b>고 Mo 슈퍼 듀플렉스일수록 냉각 속도가 결정적</b>입니다 —
+   2507 급은 노즈가 30 초대라 수냉이 필수입니다.</p>
+   <p>강도는 미세 이중상 조직과 고질소 고용강화에서 나옵니다. N ${c.N} % 만으로
+   ${f(800*c.N,0)} MPa 를 기여해 YS ${f(R.YS,0)} MPa — 오스테나이트계의 약 1.6 배입니다.
+   PREN ${f(R.pren,1)} 로 내공식성도 316L 를 크게 넘습니다.</p>`;}},
  {kw:['델타','페라이트','delta','δ','응고','열간연성','에지크랙'],ex:['ferrit'],
   fn:(q,k)=>{k=k||'304';const R=S.res[k];
    return `<p><b>${GRADES[k].label}</b> 의 δ-페라이트는 Hammar–Svensson 당량을 Hull 식에 넣어 계산합니다.
@@ -258,7 +285,7 @@ FN ≈ 3.34·Creq − 2.46·Nieq − 28.6</pre>
 
  {kw:['비교','차이','대비','compare','어느','추천'],
   fn:()=>{const ks=ORDER;
-   return `<p>4개 계열 현재 설계 비교입니다.</p>
+   return `<p>5개 계열 현재 설계 비교입니다.</p>
    ${tbl(['항목',...ks.map(k=>GRADES[k].label)],[
      ['기지상',...ks.map(k=>GRADES[k].famKo)],
      ['YS MPa',...ks.map(k=>f(S.res[k].YS,0))],
@@ -304,7 +331,7 @@ function answer(q){
     <li>예민화 · Ti/Nb 안정화</li><li>결정립 · 소둔온도/속도 · Hall–Petch</li>
     <li>성분원가 · Ni 치환</li><li>리징 · r값 · 성형성</li><li>용접 FN · σ상</li>
     <li>시장성 · 페르소나 검증 결과</li><li>강종 비교</li><li>방금 왜 바뀌었나</li></ul>
-    <p>계열명(Austenite / Martensite / Semi-Ferrite / Fully-Ferrite) 또는 강종번호(304 / 410 / 430 / 439)를 함께 쓰면 그 기준으로 답합니다.</p>`;
+    <p>계열명(Austenite / Martensite / Semi-Ferrite / Fully-Ferrite / Duplex) 또는 강종번호(304 / 410 / 430 / 439 / 2205)를 함께 쓰면 그 기준으로 답합니다.</p>`;
   return best.fn(ql,k);
 }
 function ask(q,a){ S.thread.unshift({q,a:a||answer(q)}); renderThread(); }
@@ -314,7 +341,7 @@ function renderThread(){
 }
 const SUGGEST=['304 델타페라이트가 왜 이 값인가?','Md30 이 연신율에 미치는 영향은?',
   '410 의 Ac1 과 소둔온도 관계','430 예민화를 막으려면?','Ni 원가를 줄이려면',
-  '결정립과 소둔조건의 관계','4계열 내식성 비교','439 완전 페라이트가 예민화에 강한 이유','페르소나 검증 결과','430 리징 대책','용접 FN 은 괜찮은가'];
+  '결정립과 소둔조건의 관계','5계열 내식성 비교','2205 상분율과 σ상','439 완전 페라이트가 예민화에 강한 이유','페르소나 검증 결과','430 리징 대책','용접 FN 은 괜찮은가'];
 function renderSuggest(){
   $('#suggest').innerHTML=SUGGEST.map(s=>`<button class="sg" type="button">${s}</button>`).join('');
 }
@@ -332,4 +359,4 @@ $('#askForm').addEventListener('submit',e=>{
    13. 기동
    ══════════════════════════════════════════════════════════════ */
 initState(); render(); renderPrices(); renderSuggest();
-ask('4개 계열 기준 설계 현황은?');
+ask('5개 계열 기준 설계 현황은?');

@@ -50,7 +50,7 @@ function constraints(k,R){
     add('famid','계열 정체성',R.gmax,`γmax ${R.gmax.toFixed(0)} % — 경화가 불가해 마르텐사이트계로 성립하지 않음`,'no',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.05)});
 
   // 열간연성 — δ/γ 이상역을 갖는 계열에만 적용
-  if(R.fam!=='ferritic'){
+  if(R.fam!=='ferritic' && R.fam!=='duplex'){
     if(R.dCast<2)      add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % < 2 % — 완전 오스테나이트 응고, 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.35});
     else if(R.dCast>12)add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % > 12 % — 열간압연 중 에지크랙 위험`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.35});
   }
@@ -65,6 +65,20 @@ function constraints(k,R){
     if(R.gmax>65)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % > 65 — 마르텐사이트 과다로 연성 급락`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.30});
     if(R.ridge>6)  add('ridge','리징',R.ridge,`리징지수 ${R.ridge.toFixed(1)} / 10 — 성형 후 표면 줄무늬 결함`,'wa',{t:'proc',e:'fdt',v:p.fdt-25});
     if(R.rbar<0.95)add('rbar','r값',R.rbar,`r̄ ${R.rbar.toFixed(2)} < 0.95 — 심가공 부적합`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+15});
+  }
+  if(R.fam==='duplex'){
+    if(R.aF<30||R.aF>70)
+      add('famid','계열 정체성',R.aF,`페라이트 ${R.aF.toFixed(0)} % — 30~70 % 를 벗어나 이중상으로 성립하지 않음`,'no',
+          {t:'comp',e:R.aF>70?'Ni':'Cr',v:R.aF>70?c.Ni+0.8:c.Cr+0.8});
+    else if(R.aF<40||R.aF>60)
+      add('aF','상분율',R.aF,`페라이트 ${R.aF.toFixed(0)} % — 권장 40~60 % 밖. 상분율 불균형으로 인성·내식성 저하`,'wa',
+          {t:'proc',e:'crAnnT',v:p.crAnnT+(R.aF>60?-25:25)});
+    if(R.sig>1)
+      add('sigma','σ상',R.sig,`σ상 ${R.sig.toFixed(1)} % — 취화·Cr 결핍. 600~1000 ℃ 통과를 더 빠르게`,'wa',
+          {t:'proc',e:'crAnnV',v:Math.min(130,p.crAnnV+25)});
+    if(p.crAnnT<1020)
+      add('sol','용체화',p.crAnnT,`용체화 ${p.crAnnT} ℃ < 1020 ℃ — 2차 오스테나이트·석출물 잔류`,'wa',
+          {t:'proc',e:'crAnnT',v:1060});
   }
   if(R.fam==='martensitic'){
     if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.015)});
@@ -97,10 +111,10 @@ function operability(k){
   if(p.crAnnT>1180)     add('냉연 소둔온도가 CAL 설비 한계(1180 ℃) 초과',{t:'proc',e:'crAnnT',v:1160});
   if(R.tCR<12)          add(`소둔 유효시간 ${R.tCR.toFixed(0)} s < 12 s — 재결정 미완`,{t:'proc',e:'crAnnV',v:150});
   // 재결정 하한 — 이 아래로는 회복만 일어나 냉연 조직이 그대로 남는다
-  const rxT=R.fam==='austenitic'?1000:(R.fam==='ferritic'?790:700);
+  const rxT=R.fam==='austenitic'?1000:(R.fam==='duplex'?1000:(R.fam==='ferritic'?790:700));
   if(p.crAnnT<rxT) add(`냉연 소둔 ${p.crAnnT} ℃ < 재결정 하한 ${rxT} ℃ — 냉간가공 조직 잔류, 물성 예측 불가`,
                        {t:'proc',e:'crAnnT',v:rxT+30});
-  if(R.fam!=='austenitic' && p.hrAnnT>R.ac1)
+  if(R.fam!=='austenitic' && R.fam!=='duplex' && p.hrAnnT>R.ac1)
     add(`열연 소둔 ${p.hrAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ — 소둔 목적(연화)과 반대로 재경화`,
         {t:'proc',e:'hrAnnT',v:Math.round(R.ac1)-40});
   // 고탄소 마르텐사이트계는 Ac1 을 넘겨 소둔하면 급냉으로 경화된다. 실제 연질
@@ -413,7 +427,8 @@ function outSnap(R){
   const o={};
   PROP.forEach(p=>o[p.k]=R[p.k]);
   ['creq','nieq','dCast','FN','dFin','md30','V30','msA','mu','gmax','kff',
-   'ac1','ac3','msMar','fm','rbar','ridge','d','G','DOS','Ceff','crRed','tCR','pren']
+   'ac1','ac3','msMar','fm','rbar','ridge','d','G','DOS','Ceff','crRed','tCR','pren',
+   'aF','aFhot','sig','sigEq','sigNose','tSig']
     .forEach(x=>{ if(typeof R[x]==='number'&&isFinite(R[x])) o[x]=R[x]; });
   o.costTotal=R.cost.total; o.costAlloy=R.cost.alloy;
   o.costRefine=R.cost.refine; o.costConv=R.cost.conv;

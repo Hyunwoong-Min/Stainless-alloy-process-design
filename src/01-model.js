@@ -111,10 +111,27 @@ const GRADES = {
         hrAnnT:[850,1000],hrAnnV:[25,75],crAnnT:[880,1010],crAnnV:[30,120]},
     refCost:1372, demand:'세계 STS 수요의 약 3 % — 자동차 배기계·저수조·건재',
     note:'Ti 완전 안정화로 γmax = 0. 고용 침입형 원소가 없어 r값이 높고 예민화가 원리적으로 차단.'
+  },
+  '2205':{
+    label:'STS 2205', family:'duplex', famKo:'Duplex계',
+    comp:{C:0.020,Si:0.45,Mn:1.50,P:0.025,S:0.0010,Cr:22.50,Ni:5.60,Mo:3.20,
+          Ti:0.005,Nb:0.010,Cu:0.20,N:0.170,Al:0.010},
+    proc:{slab:200,rhfT:1230,rdt:1080,fdt:980,hrT:4.00,hrW:1250,ct:600,
+          hrAnnT:1070,hrAnnV:30,crT:1.00,crW:1240,crAnnT:1060,crAnnV:40},
+    spec:{C:[0,0.030],Si:[0,1.00],Mn:[0,2.00],P:[0,0.030],S:[0,0.020],
+          Cr:[22.0,23.0],Ni:[4.50,6.50],Mo:[3.00,3.50],N:[0.14,0.20]},
+    mech:{YS:[450,null],TS:[655,null],EL:[25,null],HV:[null,310]},
+    knobs:{C:[0.005,0.028],Si:[0.20,0.90],Mn:[0.50,1.90],Cr:[22.05,22.95],
+           Ni:[4.55,6.45],Mo:[3.02,3.48],Cu:[0.05,0.90],N:[0.142,0.198],
+           Nb:[0.000,0.10],Ti:[0.000,0.10],S:[0.0004,0.010],P:[0.012,0.028]},
+    pk:{rhfT:[1180,1270],rdt:[1020,1130],fdt:[930,1030],ct:[450,680],hrT:[3.0,6.5],
+        hrAnnT:[1030,1110],hrAnnV:[18,55],crAnnT:[1030,1110],crAnnV:[25,90]},
+    refCost:4170, demand:'세계 STS 수요의 약 1 % — 화학·해양·오일가스 고내식 구조재',
+    note:'페라이트 50 % 내외의 이중상. 상분율과 σ상 석출이 물성·내식성을 동시에 지배.'
   }
 };
 /* 탭 표시 순서 */
-const ORDER = ['304','410','430','439'];
+const ORDER = ['304','410','430','439','2205'];
 const PROC_KNOBS = ['rhfT','rdt','fdt','ct','hrT','hrAnnT','hrAnnV','crAnnT','crAnnV'];
 
 /* 원료 단가 (USD / kg 함유원소) */
@@ -172,8 +189,11 @@ function stabilize(c){
 
 /* ── 결정립 성장 (Beck 형) ─────────────────────────────────── */
 const GG={austenitic:{n:2.5,Q:280000,k0:6.0e12},
+          duplex   :{n:3.0,Q:250000,k0:2.0e11},   // α/γ 상호 핀닝으로 조대화가 느리다
           ferritic  :{n:2.0,Q:230000,k0:6.56e11}};
 function grow(d0,TC,t,fam,pin){
+  if(fam==='duplex'){ const g=GG.duplex;
+    return Math.pow(Math.pow(d0,g.n)+g.k0*Math.exp(-g.Q/(8.314*(TC+273.15)))*t*pin, 1/g.n); }
   const g=GG[fam==='austenitic'?'austenitic':'ferritic'];
   const r=g.k0*Math.exp(-g.Q/(8.314*(TC+273.15)))*t*pin;
   return Math.pow(Math.pow(d0,g.n)+r,1/g.n);
@@ -195,6 +215,10 @@ const FAM_RANGE={
     C:[0.003,0.12],Si:[0.10,2.00],Mn:[0.10,1.50],P:[0.010,0.040],S:[0.0002,0.030],
     Cr:[10.5,30.0],Ni:[0,1.50],Mo:[0,4.50],Ti:[0,1.00],Nb:[0,1.00],
     Cu:[0,1.00],N:[0.003,0.060],Al:[0.001,0.150]},
+  duplex:{                                       // 2101 ~ 2304 ~ 2205 ~ 2507 영역
+    C:[0.003,0.040],Si:[0.10,1.20],Mn:[0.20,6.00],P:[0.010,0.040],S:[0.0002,0.020],
+    Cr:[19.0,28.0],Ni:[1.0,9.00],Mo:[0,5.00],Ti:[0,0.20],Nb:[0,0.30],
+    Cu:[0,2.50],N:[0.080,0.350],Al:[0.001,0.060]},
   martensitic:{                                  // 403 ~ 410 ~ 420 ~ 431 ~ 440 영역
     C:[0.030,0.90],Si:[0.10,1.50],Mn:[0.20,1.50],P:[0.010,0.040],S:[0.0002,0.030],
     Cr:[11.0,18.0],Ni:[0,4.00],Mo:[0,1.50],Ti:[0,0.30],Nb:[0,0.30],
@@ -206,6 +230,8 @@ const FAM_PK={
     hrAnnT:[1000,1200],hrAnnV:[10,80],crAnnT:[980,1180],crAnnV:[15,150]},
   ferritic:{rhfT:[1130,1280],rdt:[950,1120],fdt:[770,950],ct:[450,830],hrT:[2.5,8.0],
     hrAnnT:[780,1010],hrAnnV:[12,85],crAnnT:[760,1030],crAnnV:[18,150]},
+  duplex:{rhfT:[1150,1280],rdt:[1000,1150],fdt:[900,1050],ct:[420,700],hrT:[3.0,8.0],
+    hrAnnT:[1010,1130],hrAnnV:[12,80],crAnnT:[1010,1130],crAnnV:[18,130]},
   martensitic:{rhfT:[1140,1290],rdt:[960,1130],fdt:[800,980],ct:[450,830],hrT:[3.0,8.0],
     hrAnnT:[680,900],hrAnnV:[8,70],crAnnT:[650,1000],crAnnV:[10,120]}
 };
@@ -232,6 +258,11 @@ const REF_GRADES=[
   {n:'441',f:'ferritic',C:0.012,Cr:17.8,Ni:0.2,Mo:0.02,Mn:0.4,N:0.012,Ti:0.15,Nb:0.40,Cu:0.1},
   {n:'444',f:'ferritic',C:0.010,Cr:18.5,Ni:0.3,Mo:2.0,Mn:0.4,N:0.012,Ti:0.15,Nb:0.30,Cu:0.1},
   {n:'447',f:'ferritic',C:0.008,Cr:29.0,Ni:0.3,Mo:3.8,Mn:0.3,N:0.010,Ti:0.10,Nb:0.20,Cu:0.1},
+  {n:'2101',f:'duplex',C:0.030,Cr:21.5,Ni:1.50,Mo:0.30,Mn:5.0,N:0.220,Ti:0,Nb:0,Cu:0.3},
+  {n:'2304',f:'duplex',C:0.020,Cr:23.0,Ni:4.50,Mo:0.30,Mn:1.5,N:0.100,Ti:0,Nb:0,Cu:0.3},
+  {n:'2205',f:'duplex',C:0.020,Cr:22.5,Ni:5.60,Mo:3.20,Mn:1.5,N:0.170,Ti:0,Nb:0,Cu:0.2},
+  {n:'255',f:'duplex', C:0.025,Cr:25.5,Ni:5.80,Mo:3.20,Mn:1.0,N:0.180,Ti:0,Nb:0,Cu:1.8},
+  {n:'2507',f:'duplex',C:0.020,Cr:25.0,Ni:7.00,Mo:4.00,Mn:0.8,N:0.280,Ti:0,Nb:0,Cu:0.3},
   {n:'403',f:'martensitic',C:0.10,Cr:12.0,Ni:0.3,Mo:0.03,Mn:0.5,N:0.030,Ti:0,Nb:0,Cu:0.1},
   {n:'410',f:'martensitic',C:0.12,Cr:12.5,Ni:0.3,Mo:0.03,Mn:0.5,N:0.035,Ti:0,Nb:0,Cu:0.1},
   {n:'420',f:'martensitic',C:0.30,Cr:13.0,Ni:0.3,Mo:0.03,Mn:0.5,N:0.035,Ti:0,Nb:0,Cu:0.1},
@@ -252,3 +283,12 @@ function nearestGrade(fam,c){
   });
   return best;   // d < 1 이면 사실상 그 강종, 1~2 변형, 2 초과면 새 조성
 }
+
+/* ── 이중상(Duplex) 전용 지표 ───────────────────────────────── */
+// 상분율 — 2205/2304/2507 이 모두 Creq−Nieq ≈ 16.5 에서 페라이트 50 % 인 점에 맞춤
+const creqD=c=>c.Cr+1.5*c.Si+c.Mo+2*c.Nb+3*c.Ti;
+const nieqD=c=>c.Ni+22*c.C+18*c.N+0.4*c.Mn+0.5*c.Cu;
+const ferriteD=(c,T)=>cl(50+3.0*(creqD(c)-nieqD(c)-16.5)+0.18*(T-1060),3,97);
+// σ상 석출 감수성 — Cr·Mo·(W) 가 지배. 노즈시간(850 ℃ 기준, 초)
+const sigmaEq=c=>c.Cr+4.5*c.Mo+1.5*c.Si;
+const sigmaNose=c=>Math.pow(10,8.3-0.155*sigmaEq(c));   // 850 ℃ 노즈 (2205 ~300 s, 2507 ~30 s)

@@ -75,7 +75,7 @@ function thermo(k){
   const pct=v=>(1-v/hi)*100;
   const X=i=>i*100/(pts.length-1);
   const line=pts.map((q,i)=>`${X(i).toFixed(2)},${(pct(q[1])*H/100).toFixed(2)}`).join(' ');
-  const ac1=(R.fam!=='austenitic'&&R.gmax>5)?R.ac1:null;
+  const ac1=(R.fam!=='austenitic'&&R.fam!=='duplex'&&R.gmax>5)?R.ac1:null;
   const grid=[400,800,1200];
   return `<div class="thermo">
     <div class="cap">공정 열이력 · ${p.slab} mm 슬라브 → ${p.hrT} mm 열연 → ${p.crT} mm 냉연</div>
@@ -235,7 +235,7 @@ function idxHTML(k){
   // dk = 변경 하이라이트용 키 (outSnap 의 필드명)
   const add=(a,b,c,dk)=>it.push([a,b,c||'',dk||'']);
   add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`,'','creq');
-  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa','dCast');
+  if(R.fam!=='ferritic'&&R.fam!=='duplex') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa','dCast');
   if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa','FN');
   if(R.fam==='austenitic'){
     add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa','dFin');
@@ -243,6 +243,13 @@ function idxHTML(k){
     add('α′ @30 % 변형',f(R.V30,1)+' %','','V30');
     add('Ms',f(R.msA,0)+' ℃','','msA');
     add('비투자율 µr',f(R.mu,3),'','mu');
+  }else if(R.fam==='duplex'){
+    add('페라이트 분율',f(R.aF,1)+' %',R.aF>=40&&R.aF<=60?'ok':'wa','aF');
+    add('열간역 분율',f(R.aFhot,1)+' %',R.aFhot>=40&&R.aFhot<=80?'ok':'wa','aFhot');
+    add('σ상',f(R.sig,1)+' %',R.sig<=1?'ok':'wa','sig');
+    add('σeq (Cr+4.5Mo+1.5Si)',f(R.sigEq,1),'','sigEq');
+    add('σ 노즈시간',f(R.sigNose,0)+' s','','sigNose');
+    add('600~1000 ℃ 통과',f(R.tSig,1)+' s',R.tSig<R.sigNose*0.3?'ok':'wa','tSig');
   }else{
     add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'),'gmax');
     add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa','kff');

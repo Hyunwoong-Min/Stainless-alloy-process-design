@@ -428,7 +428,7 @@ details.basis[open]>summary::before{transform:rotate(90deg)}
     <div class="brand">
       <div class="eyebrow">Stainless alloy &amp; process design</div>
       <h1>강종 설계 워크벤치</h1>
-      <p>Austenite · Martensite · Semi-Ferrite · Fully-Ferrite 4개 계열. 성분 13종과 열연·냉연 공정 13항목을 입력하면 기계적 성질과 내식성을 예측하고, 반대로 물성 목표를 입력하면 성분 또는 제조조건을 역산합니다.</p>
+      <p>Austenite · Martensite · Semi-Ferrite · Fully-Ferrite · Duplex 5개 계열. 성분 13종과 열연·냉연 공정 13항목을 입력하면 기계적 성질과 내식성을 예측하고, 반대로 물성 목표를 입력하면 성분 또는 제조조건을 역산합니다.</p>
     </div>
     <div class="toolbar">
       <button class="btn" id="btnScope">설계 범위: 신강종 개발</button>
@@ -449,7 +449,7 @@ details.basis[open]>summary::before{transform:rotate(90deg)}
   <section class="board" id="board" hidden>
     <div class="board-head">
       <h2>페르소나 검증</h2>
-      <span class="board-sub">레드 · 블루 · 그린 · 옐로 · 블랙 5인이 현재 4개 계열 설계를 동시에 심사합니다. 점수는 각 계열의 야금 제약·조업 가능성·원가·규격 적합을 실시간 계산한 결과이며, 전원 9.0 이상이어야 설계 승인으로 판정합니다.</span>
+      <span class="board-sub">레드 · 블루 · 그린 · 옐로 · 블랙 5인이 현재 5개 계열 설계를 동시에 심사합니다. 점수는 각 계열의 야금 제약·조업 가능성·원가·규격 적합을 실시간 계산한 결과이며, 전원 9.0 이상이어야 설계 승인으로 판정합니다.</span>
       <div class="gate" id="gate">—</div>
     </div>
     <div class="personas" id="personas"></div>
@@ -460,7 +460,7 @@ details.basis[open]>summary::before{transform:rotate(90deg)}
   <section class="ask">
     <div class="ask-head">
       <h2>설계 문의</h2>
-      <p>현재 4개 계열의 실제 계산 상태를 읽어 답변합니다. 계열명이나 강종번호를 함께 쓰면 그 기준으로 답합니다.</p>
+      <p>현재 5개 계열의 실제 계산 상태를 읽어 답변합니다. 계열명이나 강종번호를 함께 쓰면 그 기준으로 답합니다.</p>
     </div>
     <form class="ask-form" id="askForm">
       <input id="askInput" placeholder="예) 304 델타페라이트가 왜 이 값인가?" autocomplete="off">
@@ -589,10 +589,27 @@ const GRADES = {
         hrAnnT:[850,1000],hrAnnV:[25,75],crAnnT:[880,1010],crAnnV:[30,120]},
     refCost:1372, demand:'세계 STS 수요의 약 3 % — 자동차 배기계·저수조·건재',
     note:'Ti 완전 안정화로 γmax = 0. 고용 침입형 원소가 없어 r값이 높고 예민화가 원리적으로 차단.'
+  },
+  '2205':{
+    label:'STS 2205', family:'duplex', famKo:'Duplex계',
+    comp:{C:0.020,Si:0.45,Mn:1.50,P:0.025,S:0.0010,Cr:22.50,Ni:5.60,Mo:3.20,
+          Ti:0.005,Nb:0.010,Cu:0.20,N:0.170,Al:0.010},
+    proc:{slab:200,rhfT:1230,rdt:1080,fdt:980,hrT:4.00,hrW:1250,ct:600,
+          hrAnnT:1070,hrAnnV:30,crT:1.00,crW:1240,crAnnT:1060,crAnnV:40},
+    spec:{C:[0,0.030],Si:[0,1.00],Mn:[0,2.00],P:[0,0.030],S:[0,0.020],
+          Cr:[22.0,23.0],Ni:[4.50,6.50],Mo:[3.00,3.50],N:[0.14,0.20]},
+    mech:{YS:[450,null],TS:[655,null],EL:[25,null],HV:[null,310]},
+    knobs:{C:[0.005,0.028],Si:[0.20,0.90],Mn:[0.50,1.90],Cr:[22.05,22.95],
+           Ni:[4.55,6.45],Mo:[3.02,3.48],Cu:[0.05,0.90],N:[0.142,0.198],
+           Nb:[0.000,0.10],Ti:[0.000,0.10],S:[0.0004,0.010],P:[0.012,0.028]},
+    pk:{rhfT:[1180,1270],rdt:[1020,1130],fdt:[930,1030],ct:[450,680],hrT:[3.0,6.5],
+        hrAnnT:[1030,1110],hrAnnV:[18,55],crAnnT:[1030,1110],crAnnV:[25,90]},
+    refCost:4170, demand:'세계 STS 수요의 약 1 % — 화학·해양·오일가스 고내식 구조재',
+    note:'페라이트 50 % 내외의 이중상. 상분율과 σ상 석출이 물성·내식성을 동시에 지배.'
   }
 };
 /* 탭 표시 순서 */
-const ORDER = ['304','410','430','439'];
+const ORDER = ['304','410','430','439','2205'];
 const PROC_KNOBS = ['rhfT','rdt','fdt','ct','hrT','hrAnnT','hrAnnV','crAnnT','crAnnV'];
 
 /* 원료 단가 (USD / kg 함유원소) */
@@ -650,8 +667,11 @@ function stabilize(c){
 
 /* ── 결정립 성장 (Beck 형) ─────────────────────────────────── */
 const GG={austenitic:{n:2.5,Q:280000,k0:6.0e12},
+          duplex   :{n:3.0,Q:250000,k0:2.0e11},   // α/γ 상호 핀닝으로 조대화가 느리다
           ferritic  :{n:2.0,Q:230000,k0:6.56e11}};
 function grow(d0,TC,t,fam,pin){
+  if(fam==='duplex'){ const g=GG.duplex;
+    return Math.pow(Math.pow(d0,g.n)+g.k0*Math.exp(-g.Q/(8.314*(TC+273.15)))*t*pin, 1/g.n); }
   const g=GG[fam==='austenitic'?'austenitic':'ferritic'];
   const r=g.k0*Math.exp(-g.Q/(8.314*(TC+273.15)))*t*pin;
   return Math.pow(Math.pow(d0,g.n)+r,1/g.n);
@@ -673,6 +693,10 @@ const FAM_RANGE={
     C:[0.003,0.12],Si:[0.10,2.00],Mn:[0.10,1.50],P:[0.010,0.040],S:[0.0002,0.030],
     Cr:[10.5,30.0],Ni:[0,1.50],Mo:[0,4.50],Ti:[0,1.00],Nb:[0,1.00],
     Cu:[0,1.00],N:[0.003,0.060],Al:[0.001,0.150]},
+  duplex:{                                       // 2101 ~ 2304 ~ 2205 ~ 2507 영역
+    C:[0.003,0.040],Si:[0.10,1.20],Mn:[0.20,6.00],P:[0.010,0.040],S:[0.0002,0.020],
+    Cr:[19.0,28.0],Ni:[1.0,9.00],Mo:[0,5.00],Ti:[0,0.20],Nb:[0,0.30],
+    Cu:[0,2.50],N:[0.080,0.350],Al:[0.001,0.060]},
   martensitic:{                                  // 403 ~ 410 ~ 420 ~ 431 ~ 440 영역
     C:[0.030,0.90],Si:[0.10,1.50],Mn:[0.20,1.50],P:[0.010,0.040],S:[0.0002,0.030],
     Cr:[11.0,18.0],Ni:[0,4.00],Mo:[0,1.50],Ti:[0,0.30],Nb:[0,0.30],
@@ -684,6 +708,8 @@ const FAM_PK={
     hrAnnT:[1000,1200],hrAnnV:[10,80],crAnnT:[980,1180],crAnnV:[15,150]},
   ferritic:{rhfT:[1130,1280],rdt:[950,1120],fdt:[770,950],ct:[450,830],hrT:[2.5,8.0],
     hrAnnT:[780,1010],hrAnnV:[12,85],crAnnT:[760,1030],crAnnV:[18,150]},
+  duplex:{rhfT:[1150,1280],rdt:[1000,1150],fdt:[900,1050],ct:[420,700],hrT:[3.0,8.0],
+    hrAnnT:[1010,1130],hrAnnV:[12,80],crAnnT:[1010,1130],crAnnV:[18,130]},
   martensitic:{rhfT:[1140,1290],rdt:[960,1130],fdt:[800,980],ct:[450,830],hrT:[3.0,8.0],
     hrAnnT:[680,900],hrAnnV:[8,70],crAnnT:[650,1000],crAnnV:[10,120]}
 };
@@ -710,6 +736,11 @@ const REF_GRADES=[
   {n:'441',f:'ferritic',C:0.012,Cr:17.8,Ni:0.2,Mo:0.02,Mn:0.4,N:0.012,Ti:0.15,Nb:0.40,Cu:0.1},
   {n:'444',f:'ferritic',C:0.010,Cr:18.5,Ni:0.3,Mo:2.0,Mn:0.4,N:0.012,Ti:0.15,Nb:0.30,Cu:0.1},
   {n:'447',f:'ferritic',C:0.008,Cr:29.0,Ni:0.3,Mo:3.8,Mn:0.3,N:0.010,Ti:0.10,Nb:0.20,Cu:0.1},
+  {n:'2101',f:'duplex',C:0.030,Cr:21.5,Ni:1.50,Mo:0.30,Mn:5.0,N:0.220,Ti:0,Nb:0,Cu:0.3},
+  {n:'2304',f:'duplex',C:0.020,Cr:23.0,Ni:4.50,Mo:0.30,Mn:1.5,N:0.100,Ti:0,Nb:0,Cu:0.3},
+  {n:'2205',f:'duplex',C:0.020,Cr:22.5,Ni:5.60,Mo:3.20,Mn:1.5,N:0.170,Ti:0,Nb:0,Cu:0.2},
+  {n:'255',f:'duplex', C:0.025,Cr:25.5,Ni:5.80,Mo:3.20,Mn:1.0,N:0.180,Ti:0,Nb:0,Cu:1.8},
+  {n:'2507',f:'duplex',C:0.020,Cr:25.0,Ni:7.00,Mo:4.00,Mn:0.8,N:0.280,Ti:0,Nb:0,Cu:0.3},
   {n:'403',f:'martensitic',C:0.10,Cr:12.0,Ni:0.3,Mo:0.03,Mn:0.5,N:0.030,Ti:0,Nb:0,Cu:0.1},
   {n:'410',f:'martensitic',C:0.12,Cr:12.5,Ni:0.3,Mo:0.03,Mn:0.5,N:0.035,Ti:0,Nb:0,Cu:0.1},
   {n:'420',f:'martensitic',C:0.30,Cr:13.0,Ni:0.3,Mo:0.03,Mn:0.5,N:0.035,Ti:0,Nb:0,Cu:0.1},
@@ -730,6 +761,15 @@ function nearestGrade(fam,c){
   });
   return best;   // d < 1 이면 사실상 그 강종, 1~2 변형, 2 초과면 새 조성
 }
+
+/* ── 이중상(Duplex) 전용 지표 ───────────────────────────────── */
+// 상분율 — 2205/2304/2507 이 모두 Creq−Nieq ≈ 16.5 에서 페라이트 50 % 인 점에 맞춤
+const creqD=c=>c.Cr+1.5*c.Si+c.Mo+2*c.Nb+3*c.Ti;
+const nieqD=c=>c.Ni+22*c.C+18*c.N+0.4*c.Mn+0.5*c.Cu;
+const ferriteD=(c,T)=>cl(50+3.0*(creqD(c)-nieqD(c)-16.5)+0.18*(T-1060),3,97);
+// σ상 석출 감수성 — Cr·Mo·(W) 가 지배. 노즈시간(850 ℃ 기준, 초)
+const sigmaEq=c=>c.Cr+4.5*c.Mo+1.5*c.Si;
+const sigmaNose=c=>Math.pow(10,8.3-0.155*sigmaEq(c));   // 850 ℃ 노즈 (2205 ~300 s, 2507 ~30 s)
 /* ══════════════════════════════════════════════════════════════
    3. 순방향 모델 : 성분 + 제조조건 → 조직 → 물성 → 원가
    ══════════════════════════════════════════════════════════════ */
@@ -759,19 +799,19 @@ function compute(key, comp, proc, prices){
   /* ── 3-3 결정립 이력 ────────────────────────────────────── */
   const pin=1/(1+12*(c.Nb+c.Ti)+3*Ceff);
   R.pin=pin;
-  const hbBase=fam==='austenitic'?22:55;
+  const hbBase=fam==='austenitic'?22:(fam==='duplex'?14:55);
   R.dHB=hbBase*Math.exp((p.fdt-900)/130)*(1+Math.max(0,p.ct-550)/1200)
         *Math.pow(60/Math.max(30,hrRed),0.3);
 
   // γmax≈0 인 완전 페라이트계는 오스테나이트가 생기지 않으므로 Ac1 분기 자체가 무의미
   const canTransform = R.gmax > 5;
-  const subHR = fam!=='austenitic' && canTransform && p.hrAnnT < R.ac1;
-  const subCR = fam!=='austenitic' && canTransform && p.crAnnT < R.ac1;
+  const subHR = fam!=='austenitic' && fam!=='duplex' && canTransform && p.hrAnnT < R.ac1;
+  const subCR = fam!=='austenitic' && fam!=='duplex' && canTransform && p.crAnnT < R.ac1;
   // 열연 소둔 후
   if(subHR){ R.dHRA=grow(14,p.hrAnnT,tHR,fam,0.35); }
   else     { R.dHRA=grow(R.dHB*0.6,p.hrAnnT,tHR,fam,pin); }
   // 냉연 재결정 초기립 → 최종립
-  let d0=(fam==='austenitic'?4.5:6.0)+0.10*R.dHRA*Math.pow(70/Math.max(20,crRed),0.8);
+  let d0=(fam==='austenitic'?4.5:(fam==='duplex'?3.0:6.0))+0.10*R.dHRA*Math.pow(70/Math.max(20,crRed),0.8);
   if(subCR) d0=Math.max(d0,12);
   R.d0=d0;
   R.d=grow(d0,p.crAnnT,tCR,fam,subCR?0.35:pin);
@@ -801,12 +841,26 @@ function compute(key, comp, proc, prices){
 
   /* ── 3-6 마르텐사이트 변태 (400계) ──────────────────────── */
   R.fm=0; R.Cg=0;
-  if(fam!=='austenitic' && canTransform && p.crAnnT>R.ac1){
+  if(fam!=='austenitic' && fam!=='duplex' && canTransform && p.crAnnT>R.ac1){
     const fg=cl((p.crAnnT-R.ac1)/Math.max(1,R.ac3-R.ac1),0,1)*R.gmax/100;
     R.Cg=Math.min(c.C/Math.max(fg,0.05),0.50);
     const rate=20*(p.crAnnV/50)/Math.max(0.25,p.crT);   // ℃/s 근사
     R.coolRate=rate;
     R.fm=fg*cl(rate/1.0,0.35,1);                        // 410은 공랭경화형
+  }
+
+  /* ── 3-6b 이중상 상분율 · σ상 ───────────────────────────── */
+  R.aF=null; R.sig=0; R.sigNose=null;
+  if(fam==='duplex'){
+    R.aF=ferriteD(c,p.crAnnT);                 // 최종 소둔온도에서의 페라이트 %
+    R.aFhot=ferriteD(c,p.rhfT);                // 열간압연역 상분율 (열간가공성)
+    R.sigEq=sigmaEq(c);
+    R.sigNose=sigmaNose(c);
+    // 1000→600 ℃ 통과시간. 이중상 라인은 수냉이라 짧다
+    R.tSig=8*Math.sqrt(p.crT)*Math.sqrt(50/p.crAnnV);
+    R.sig=100*Math.pow(cl(R.tSig/R.sigNose,0,1),2.5);
+    // 권취온도가 σ역(600~1000 ℃)에 걸리면 코일 서냉으로 대량 석출
+    if(p.ct>600&&p.ct<1000) R.sig=Math.min(100,R.sig+35*(1-Math.abs(p.ct-850)/250));
   }
 
   /* ── 3-7 기계적 성질 ────────────────────────────────────── */
@@ -836,6 +890,18 @@ function compute(key, comp, proc, prices){
         +cl(0.05*(R.d-25),-1.5,2.5)-2.5*Math.max(0,0.6-p.crT);
     ELg=cl(ELg,8,62);
     HV=0.21*TS+0.09*YS+5;
+  }else if(fam==='duplex'){
+    /* ── 이중상 : 상분율과 σ상이 물성·내식성을 함께 지배 ── */
+    const hpD=Math.pow(R.d/1000,-0.5);
+    const ysD=90+1.8*c.Cr+35*c.Si+18*c.Mn+10*c.Mo+800*c.N+14*hpD
+              +0.6*Math.abs(R.aF-50);          // 상분율이 50 에서 멀수록 약간 경화
+    const tsD=ysD+210+400*c.N;
+    // σ상은 취화 인자 — 연신을 깎고 경도를 올린다
+    const elD=33-0.020*(ysD-450)-0.15*Math.abs(R.aF-50)-0.35*R.sig
+              -2.0*Math.max(0,0.6-p.crT);
+    YS=ysD; TS=tsD; ELg=cl(elD,5,40);
+    HV=0.24*tsD+0.10*ysD+15+1.5*R.sig;
+    R.ysD=ysD; R.tsD=tsD;
   }else{
     const freeI=Math.min(Ceff+Neff, subCR?0.002:0.008);
     R.freeI=freeI;
@@ -864,9 +930,9 @@ function compute(key, comp, proc, prices){
   R.elMd = fam==="austenitic" ? ELg : null;
 
   /* ── 3-8 내식성 ─────────────────────────────────────────── */
-  const famOff={austenitic:0,ferritic:-50,martensitic:-60}[fam];
+  const famOff={austenitic:0,ferritic:-50,martensitic:-60,duplex:160}[fam];
   R.dS=-60*(L10(Math.max(c.S,1e-5))+3.7);
-  R.dSens=-1.8*R.DOS;
+  R.dSens=-1.8*R.DOS-5*R.sig;          // σ상은 주변 Cr 결핍으로 공식 기점이 된다
   R.dTi=-100*Math.max(0,c.Ti-0.05);
   R.dGr=-0.4*(R.d-25);
   R.Ep=-75+21*R.pren+famOff+R.dS+R.dSens+R.dTi+R.dGr;
@@ -914,6 +980,25 @@ function compute(key, comp, proc, prices){
   eq('용접부 페라이트수 (WRC-1992)',
      'Creq = Cr+Mo+0.7Nb , Nieq = Ni+35C+20N+0.25Cu\nFN ≈ 3.34Creq − 2.46Nieq − 28.6',
      `FN = ${R.FN.toFixed(1)}`,'WRC-1992 등FN선의 선형근사');
+  if(fam==='duplex'){
+    eq('이중상 상분율',
+       'Creq = Cr+1.5Si+Mo+2Nb+3Ti\nNieq = Ni+22C+18N+0.4Mn+0.5Cu\nα% = 50 + 3.0·(Creq − Nieq − 16.5) + 0.18·(T − 1060)',
+       `Creq ${creqD(c).toFixed(2)} , Nieq ${nieqD(c).toFixed(2)} , 차 ${(creqD(c)-nieqD(c)).toFixed(2)}\n`
+       +`소둔 ${p.crAnnT} ℃ → 페라이트 ${R.aF.toFixed(1)} %  (목표 40~60 %)\n`
+       +`열간역 ${p.rhfT} ℃ → ${R.aFhot.toFixed(1)} %  (열간가공성)`,
+       '2205·2304·2507 이 모두 Creq−Nieq ≈ 16.5 에서 페라이트 50 % 인 점에 맞춘 내부 상관식');
+    eq('σ상 석출 감수성',
+       'σeq = Cr + 4.5Mo + 1.5Si\nlog₁₀ t_nose[s] = 8.3 − 0.155·σeq   (850 ℃ 기준)',
+       `σeq ${R.sigEq.toFixed(1)} → 노즈시간 ${R.sigNose.toFixed(0)} s\n`
+       +`1000→600 ℃ 통과 ${R.tSig.toFixed(1)} s , 권취 ${p.ct} ℃\n`
+       +`σ상 ${R.sig.toFixed(1)} %  → 연신 ${(-0.35*R.sig).toFixed(1)} %p, Epit ${(-5*R.sig).toFixed(0)} mV, HV +${(1.5*R.sig).toFixed(0)}`,
+       'σ상은 600~1000 ℃ 에서 석출해 취화와 Cr 결핍을 동시에 일으킨다. 권취·소둔 냉각이 이 구간을 빨리 지나야 한다');
+    eq('강도 — 이중상 미세조직 + 질소 고용',
+       'σy = 90+1.8Cr+35Si+18Mn+10Mo+800N+14·d^−½ + 0.6·|α−50|',
+       `d ${R.d.toFixed(1)} µm (ASTM ${R.G.toFixed(1)}) → YS ${R.ysD.toFixed(0)} , TS ${R.tsD.toFixed(0)} MPa\n`
+       +`N ${c.N} % 기여 ${(800*c.N).toFixed(0)} MPa — 이중상 고강도의 주 인자`,
+       '오스테나이트계 대비 2 배 강도는 미세 이중상 조직과 고질소 고용강화에서 나온다');
+  }
   if(fam==='austenitic'){
     eq('Md30 — 가공유기 마르텐사이트 (Nohara)',
        'Md30 = 551 − 462(C+N) − 9.2Si − 8.1Mn − 13.7Cr\n        − 29(Ni+Cu) − 18.5Mo − 68Nb − 1.42(ν−8)',
@@ -932,7 +1017,7 @@ function compute(key, comp, proc, prices){
        'Ms = 1305 − 1665(C+N) − 28Si − 33Mn − 42Cr − 61Ni',
        `Ms = ${R.msA.toFixed(0)} ℃ → 실온에서 열적 마르텐사이트 없음`,
        'Eichelman & Hull, Trans. ASM 45 (1953)');
-  }else{
+  }else if(fam==="ferritic"||fam==="martensitic"){
     eq('γmax — 최대 오스테나이트량',
        '%γmax = 420C+470N+23Ni+9Cu+7Mn−11.5Cr−11.5Si\n          −12Mo−47Nb−49Ti−52Al+189',
        `γmax = ${R.gmax.toFixed(1)} %`,'페라이트계 STS γmax 회귀식');
@@ -952,7 +1037,7 @@ function compute(key, comp, proc, prices){
        `σy(페라이트) = ${R.ysF.toFixed(0)} MPa , d = ${R.d.toFixed(1)} µm (ASTM ${R.G.toFixed(1)})`
        +(R.fm>0.01?`\n마르텐사이트 ${(R.fm*100).toFixed(0)} % 혼합 → ${YS.toFixed(0)} MPa`:''),
        'ky = 0.6 MPa·m^½ (BCC), 고용강화계수는 페라이트계 문헌값');
-    eq('성형성 지표','r̄ = f(냉간압하율, 열연소둔, 고용 C+N, Nb+Ti)\n리징 = f(열연립경, 압하율, FDT)',
+    if(fam==="ferritic") eq("성형성 지표",'r̄ = f(냉간압하율, 열연소둔, 고용 C+N, Nb+Ti)\n리징 = f(열연립경, 압하율, FDT)',
        `r̄ = ${R.rbar.toFixed(2)} , 리징지수 = ${R.ridge.toFixed(1)} / 10`,
        '{111} 재결정집합조직 형성 인자 기반 내부 지수');
   }
@@ -1035,7 +1120,7 @@ function constraints(k,R){
     add('famid','계열 정체성',R.gmax,`γmax ${R.gmax.toFixed(0)} % — 경화가 불가해 마르텐사이트계로 성립하지 않음`,'no',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.05)});
 
   // 열간연성 — δ/γ 이상역을 갖는 계열에만 적용
-  if(R.fam!=='ferritic'){
+  if(R.fam!=='ferritic' && R.fam!=='duplex'){
     if(R.dCast<2)      add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % < 2 % — 완전 오스테나이트 응고, 고온균열 위험`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.35});
     else if(R.dCast>12)add('dcast','열간연성 δ',R.dCast,`1300 ℃ δ ${R.dCast.toFixed(1)} % > 12 % — 열간압연 중 에지크랙 위험`,'wa',{t:'comp',e:'Ni',v:c.Ni+0.35});
   }
@@ -1050,6 +1135,20 @@ function constraints(k,R){
     if(R.gmax>65)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % > 65 — 마르텐사이트 과다로 연성 급락`,'wa',{t:'comp',e:'Cr',v:c.Cr+0.30});
     if(R.ridge>6)  add('ridge','리징',R.ridge,`리징지수 ${R.ridge.toFixed(1)} / 10 — 성형 후 표면 줄무늬 결함`,'wa',{t:'proc',e:'fdt',v:p.fdt-25});
     if(R.rbar<0.95)add('rbar','r값',R.rbar,`r̄ ${R.rbar.toFixed(2)} < 0.95 — 심가공 부적합`,'wa',{t:'proc',e:'crAnnT',v:p.crAnnT+15});
+  }
+  if(R.fam==='duplex'){
+    if(R.aF<30||R.aF>70)
+      add('famid','계열 정체성',R.aF,`페라이트 ${R.aF.toFixed(0)} % — 30~70 % 를 벗어나 이중상으로 성립하지 않음`,'no',
+          {t:'comp',e:R.aF>70?'Ni':'Cr',v:R.aF>70?c.Ni+0.8:c.Cr+0.8});
+    else if(R.aF<40||R.aF>60)
+      add('aF','상분율',R.aF,`페라이트 ${R.aF.toFixed(0)} % — 권장 40~60 % 밖. 상분율 불균형으로 인성·내식성 저하`,'wa',
+          {t:'proc',e:'crAnnT',v:p.crAnnT+(R.aF>60?-25:25)});
+    if(R.sig>1)
+      add('sigma','σ상',R.sig,`σ상 ${R.sig.toFixed(1)} % — 취화·Cr 결핍. 600~1000 ℃ 통과를 더 빠르게`,'wa',
+          {t:'proc',e:'crAnnV',v:Math.min(130,p.crAnnV+25)});
+    if(p.crAnnT<1020)
+      add('sol','용체화',p.crAnnT,`용체화 ${p.crAnnT} ℃ < 1020 ℃ — 2차 오스테나이트·석출물 잔류`,'wa',
+          {t:'proc',e:'crAnnT',v:1060});
   }
   if(R.fam==='martensitic'){
     if(R.gmax<90)  add('gmax','γmax',R.gmax,`γmax ${R.gmax.toFixed(0)} % < 90 — 완전 경화 불가, δ 잔류`,'wa',{t:'comp',e:'C',v:Math.min(0.9,c.C+0.015)});
@@ -1082,10 +1181,10 @@ function operability(k){
   if(p.crAnnT>1180)     add('냉연 소둔온도가 CAL 설비 한계(1180 ℃) 초과',{t:'proc',e:'crAnnT',v:1160});
   if(R.tCR<12)          add(`소둔 유효시간 ${R.tCR.toFixed(0)} s < 12 s — 재결정 미완`,{t:'proc',e:'crAnnV',v:150});
   // 재결정 하한 — 이 아래로는 회복만 일어나 냉연 조직이 그대로 남는다
-  const rxT=R.fam==='austenitic'?1000:(R.fam==='ferritic'?790:700);
+  const rxT=R.fam==='austenitic'?1000:(R.fam==='duplex'?1000:(R.fam==='ferritic'?790:700));
   if(p.crAnnT<rxT) add(`냉연 소둔 ${p.crAnnT} ℃ < 재결정 하한 ${rxT} ℃ — 냉간가공 조직 잔류, 물성 예측 불가`,
                        {t:'proc',e:'crAnnT',v:rxT+30});
-  if(R.fam!=='austenitic' && p.hrAnnT>R.ac1)
+  if(R.fam!=='austenitic' && R.fam!=='duplex' && p.hrAnnT>R.ac1)
     add(`열연 소둔 ${p.hrAnnT} ℃ > Ac1 ${R.ac1.toFixed(0)} ℃ — 소둔 목적(연화)과 반대로 재경화`,
         {t:'proc',e:'hrAnnT',v:Math.round(R.ac1)-40});
   // 고탄소 마르텐사이트계는 Ac1 을 넘겨 소둔하면 급냉으로 경화된다. 실제 연질
@@ -1398,7 +1497,8 @@ function outSnap(R){
   const o={};
   PROP.forEach(p=>o[p.k]=R[p.k]);
   ['creq','nieq','dCast','FN','dFin','md30','V30','msA','mu','gmax','kff',
-   'ac1','ac3','msMar','fm','rbar','ridge','d','G','DOS','Ceff','crRed','tCR','pren']
+   'ac1','ac3','msMar','fm','rbar','ridge','d','G','DOS','Ceff','crRed','tCR','pren',
+   'aF','aFhot','sig','sigEq','sigNose','tSig']
     .forEach(x=>{ if(typeof R[x]==='number'&&isFinite(R[x])) o[x]=R[x]; });
   o.costTotal=R.cost.total; o.costAlloy=R.cost.alloy;
   o.costRefine=R.cost.refine; o.costConv=R.cost.conv;
@@ -1637,7 +1737,7 @@ function thermo(k){
   const pct=v=>(1-v/hi)*100;
   const X=i=>i*100/(pts.length-1);
   const line=pts.map((q,i)=>`${X(i).toFixed(2)},${(pct(q[1])*H/100).toFixed(2)}`).join(' ');
-  const ac1=(R.fam!=='austenitic'&&R.gmax>5)?R.ac1:null;
+  const ac1=(R.fam!=='austenitic'&&R.fam!=='duplex'&&R.gmax>5)?R.ac1:null;
   const grid=[400,800,1200];
   return `<div class="thermo">
     <div class="cap">공정 열이력 · ${p.slab} mm 슬라브 → ${p.hrT} mm 열연 → ${p.crT} mm 냉연</div>
@@ -1797,7 +1897,7 @@ function idxHTML(k){
   // dk = 변경 하이라이트용 키 (outSnap 의 필드명)
   const add=(a,b,c,dk)=>it.push([a,b,c||'',dk||'']);
   add('Creq / Nieq',`${f(R.creq,2)} / ${f(R.nieq,2)}`,'','creq');
-  if(R.fam!=='ferritic') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa','dCast');
+  if(R.fam!=='ferritic'&&R.fam!=='duplex') add('δ @1300 ℃',f(R.dCast,1)+' %',R.dCast>=2&&R.dCast<=12?'ok':'wa','dCast');
   if(R.fam==='austenitic') add('용접 FN',f(R.FN,1),R.FN>=3&&R.FN<=12?'ok':'wa','FN');
   if(R.fam==='austenitic'){
     add('잔류 δ',f(R.dFin,2)+' %',R.dFin<=1?'ok':'wa','dFin');
@@ -1805,6 +1905,13 @@ function idxHTML(k){
     add('α′ @30 % 변형',f(R.V30,1)+' %','','V30');
     add('Ms',f(R.msA,0)+' ℃','','msA');
     add('비투자율 µr',f(R.mu,3),'','mu');
+  }else if(R.fam==='duplex'){
+    add('페라이트 분율',f(R.aF,1)+' %',R.aF>=40&&R.aF<=60?'ok':'wa','aF');
+    add('열간역 분율',f(R.aFhot,1)+' %',R.aFhot>=40&&R.aFhot<=80?'ok':'wa','aFhot');
+    add('σ상',f(R.sig,1)+' %',R.sig<=1?'ok':'wa','sig');
+    add('σeq (Cr+4.5Mo+1.5Si)',f(R.sigEq,1),'','sigEq');
+    add('σ 노즈시간',f(R.sigNose,0)+' s','','sigNose');
+    add('600~1000 ℃ 통과',f(R.tSig,1)+' s',R.tSig<R.sigNose*0.3?'ok':'wa','tSig');
   }else{
     add('γmax',f(R.gmax,1)+' %',R.fam==='martensitic'?(R.gmax>=90?'ok':'wa'):(R.gmax<=65?'ok':'wa'),'gmax');
     add('KFF',f(R.kff,2),R.kff>=13.5?'ok':'wa','kff');
@@ -2278,6 +2385,7 @@ function renderPrices(){
    ══════════════════════════════════════════════════════════════ */
 function which(q){
   for(const k of ORDER) if(q.includes(k)) return k;
+  if(/duplex|이중상|2205|2507|2304|2101/i.test(q)) return '2205';
   if(/fully.?ferrite|완전\s*페라이트|풀\s*페라이트/i.test(q)) return '439';
   if(/semi.?ferrite|반\s*페라이트|세미/i.test(q)) return '430';
   if(/austenit|오스테나이트|300계/i.test(q)) return '304';
@@ -2289,6 +2397,32 @@ const tbl=(head,rows)=>`<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join(''
   <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
 const INTENTS=[
+ {kw:['duplex','이중상','상분율','페라이트분율','시그마','σ상','sigma','2205','2507'],
+  fn:(q,k)=>{k=(k&&S.res[k].fam==='duplex')?k:'2205';const R=S.res[k],c=S.g[k].comp,p=S.g[k].proc;
+   return `<p><b>${GRADES[k].famKo}</b>(기준 ${GRADES[k].label})는 페라이트와 오스테나이트가 절반씩인 이중상입니다.
+   두 상의 분율과 σ상 석출이 물성·내식성을 동시에 지배합니다.</p>
+   <pre>Creq = Cr+1.5Si+Mo+2Nb+3Ti          = ${creqD(c).toFixed(2)}
+Nieq = Ni+22C+18N+0.4Mn+0.5Cu       = ${nieqD(c).toFixed(2)}
+α% = 50 + 3.0·(Creq − Nieq − 16.5) + 0.18·(T − 1060)</pre>
+   ${tbl(['온도','용도','페라이트 %','판정'],[
+     [p.crAnnT+' ℃','최종 용체화',f(R.aF,1),R.aF>=40&&R.aF<=60?'적정 (40~60)':'불균형'],
+     [p.rhfT+' ℃','열간압연역',f(R.aFhot,1),R.aFhot>=40&&R.aFhot<=80?'가공 가능':'열간연성 저하'],
+     ['1060 ℃','설계 기준점',f(ferriteD(c,1060),1),'—']])}
+   <p>상분율은 <b>소둔온도에 0.18 %/℃</b> 로 반응합니다. ${p.crAnnT} ℃ 를 ±30 ℃ 움직이면
+   ${f(ferriteD(c,p.crAnnT-30),1)} ~ ${f(ferriteD(c,p.crAnnT+30),1)} % 로 변합니다.
+   성분 쪽에서는 Cr·Mo 가 페라이트를, Ni·N·Mn 이 오스테나이트를 늘립니다
+   (N 은 계수 18 로 가장 강력하면서 값도 쌉니다).</p>
+   <pre>σeq = Cr + 4.5Mo + 1.5Si            = ${f(R.sigEq,1)}
+log₁₀ t_nose[s] = 8.3 − 0.155·σeq   → ${f(R.sigNose,0)} s (850 ℃)
+1000→600 ℃ 통과 ${f(R.tSig,1)} s , 권취 ${p.ct} ℃  → σ상 ${f(R.sig,2)} %</pre>
+   <p>σ상은 600~1000 ℃ 에서 석출해 <b>취화와 Cr 결핍을 동시에</b> 일으킵니다.
+   ${R.sig<=1?`현재 통과시간이 노즈의 ${f(R.tSig/R.sigNose*100,0)} % 라 실질적으로 석출하지 않습니다.`
+     :`현재 ${f(R.sig,1)} % 로 연신 ${f(-0.35*R.sig,1)} %p, Epit ${f(-5*R.sig,0)} mV 손실이 발생합니다. 냉각을 더 빠르게 하십시오.`}
+   Mo 가 σeq 에 4.5 배로 들어가므로 <b>고 Mo 슈퍼 듀플렉스일수록 냉각 속도가 결정적</b>입니다 —
+   2507 급은 노즈가 30 초대라 수냉이 필수입니다.</p>
+   <p>강도는 미세 이중상 조직과 고질소 고용강화에서 나옵니다. N ${c.N} % 만으로
+   ${f(800*c.N,0)} MPa 를 기여해 YS ${f(R.YS,0)} MPa — 오스테나이트계의 약 1.6 배입니다.
+   PREN ${f(R.pren,1)} 로 내공식성도 316L 를 크게 넘습니다.</p>`;}},
  {kw:['델타','페라이트','delta','δ','응고','열간연성','에지크랙'],ex:['ferrit'],
   fn:(q,k)=>{k=k||'304';const R=S.res[k];
    return `<p><b>${GRADES[k].label}</b> 의 δ-페라이트는 Hammar–Svensson 당량을 Hull 식에 넣어 계산합니다.
@@ -2514,7 +2648,7 @@ FN ≈ 3.34·Creq − 2.46·Nieq − 28.6</pre>
 
  {kw:['비교','차이','대비','compare','어느','추천'],
   fn:()=>{const ks=ORDER;
-   return `<p>4개 계열 현재 설계 비교입니다.</p>
+   return `<p>5개 계열 현재 설계 비교입니다.</p>
    ${tbl(['항목',...ks.map(k=>GRADES[k].label)],[
      ['기지상',...ks.map(k=>GRADES[k].famKo)],
      ['YS MPa',...ks.map(k=>f(S.res[k].YS,0))],
@@ -2560,7 +2694,7 @@ function answer(q){
     <li>예민화 · Ti/Nb 안정화</li><li>결정립 · 소둔온도/속도 · Hall–Petch</li>
     <li>성분원가 · Ni 치환</li><li>리징 · r값 · 성형성</li><li>용접 FN · σ상</li>
     <li>시장성 · 페르소나 검증 결과</li><li>강종 비교</li><li>방금 왜 바뀌었나</li></ul>
-    <p>계열명(Austenite / Martensite / Semi-Ferrite / Fully-Ferrite) 또는 강종번호(304 / 410 / 430 / 439)를 함께 쓰면 그 기준으로 답합니다.</p>`;
+    <p>계열명(Austenite / Martensite / Semi-Ferrite / Fully-Ferrite / Duplex) 또는 강종번호(304 / 410 / 430 / 439 / 2205)를 함께 쓰면 그 기준으로 답합니다.</p>`;
   return best.fn(ql,k);
 }
 function ask(q,a){ S.thread.unshift({q,a:a||answer(q)}); renderThread(); }
@@ -2570,7 +2704,7 @@ function renderThread(){
 }
 const SUGGEST=['304 델타페라이트가 왜 이 값인가?','Md30 이 연신율에 미치는 영향은?',
   '410 의 Ac1 과 소둔온도 관계','430 예민화를 막으려면?','Ni 원가를 줄이려면',
-  '결정립과 소둔조건의 관계','4계열 내식성 비교','439 완전 페라이트가 예민화에 강한 이유','페르소나 검증 결과','430 리징 대책','용접 FN 은 괜찮은가'];
+  '결정립과 소둔조건의 관계','5계열 내식성 비교','2205 상분율과 σ상','439 완전 페라이트가 예민화에 강한 이유','페르소나 검증 결과','430 리징 대책','용접 FN 은 괜찮은가'];
 function renderSuggest(){
   $('#suggest').innerHTML=SUGGEST.map(s=>`<button class="sg" type="button">${s}</button>`).join('');
 }
@@ -2588,5 +2722,5 @@ $('#askForm').addEventListener('submit',e=>{
    13. 기동
    ══════════════════════════════════════════════════════════════ */
 initState(); render(); renderPrices(); renderSuggest();
-ask('4개 계열 기준 설계 현황은?');
+ask('5개 계열 기준 설계 현황은?');
 </script>

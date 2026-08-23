@@ -27,19 +27,19 @@ function compute(key, comp, proc, prices){
   /* ── 3-3 결정립 이력 ────────────────────────────────────── */
   const pin=1/(1+12*(c.Nb+c.Ti)+3*Ceff);
   R.pin=pin;
-  const hbBase=fam==='austenitic'?22:55;
+  const hbBase=fam==='austenitic'?22:(fam==='duplex'?14:55);
   R.dHB=hbBase*Math.exp((p.fdt-900)/130)*(1+Math.max(0,p.ct-550)/1200)
         *Math.pow(60/Math.max(30,hrRed),0.3);
 
   // γmax≈0 인 완전 페라이트계는 오스테나이트가 생기지 않으므로 Ac1 분기 자체가 무의미
   const canTransform = R.gmax > 5;
-  const subHR = fam!=='austenitic' && canTransform && p.hrAnnT < R.ac1;
-  const subCR = fam!=='austenitic' && canTransform && p.crAnnT < R.ac1;
+  const subHR = fam!=='austenitic' && fam!=='duplex' && canTransform && p.hrAnnT < R.ac1;
+  const subCR = fam!=='austenitic' && fam!=='duplex' && canTransform && p.crAnnT < R.ac1;
   // 열연 소둔 후
   if(subHR){ R.dHRA=grow(14,p.hrAnnT,tHR,fam,0.35); }
   else     { R.dHRA=grow(R.dHB*0.6,p.hrAnnT,tHR,fam,pin); }
   // 냉연 재결정 초기립 → 최종립
-  let d0=(fam==='austenitic'?4.5:6.0)+0.10*R.dHRA*Math.pow(70/Math.max(20,crRed),0.8);
+  let d0=(fam==='austenitic'?4.5:(fam==='duplex'?3.0:6.0))+0.10*R.dHRA*Math.pow(70/Math.max(20,crRed),0.8);
   if(subCR) d0=Math.max(d0,12);
   R.d0=d0;
   R.d=grow(d0,p.crAnnT,tCR,fam,subCR?0.35:pin);
@@ -69,12 +69,26 @@ function compute(key, comp, proc, prices){
 
   /* ── 3-6 마르텐사이트 변태 (400계) ──────────────────────── */
   R.fm=0; R.Cg=0;
-  if(fam!=='austenitic' && canTransform && p.crAnnT>R.ac1){
+  if(fam!=='austenitic' && fam!=='duplex' && canTransform && p.crAnnT>R.ac1){
     const fg=cl((p.crAnnT-R.ac1)/Math.max(1,R.ac3-R.ac1),0,1)*R.gmax/100;
     R.Cg=Math.min(c.C/Math.max(fg,0.05),0.50);
     const rate=20*(p.crAnnV/50)/Math.max(0.25,p.crT);   // ℃/s 근사
     R.coolRate=rate;
     R.fm=fg*cl(rate/1.0,0.35,1);                        // 410은 공랭경화형
+  }
+
+  /* ── 3-6b 이중상 상분율 · σ상 ───────────────────────────── */
+  R.aF=null; R.sig=0; R.sigNose=null;
+  if(fam==='duplex'){
+    R.aF=ferriteD(c,p.crAnnT);                 // 최종 소둔온도에서의 페라이트 %
+    R.aFhot=ferriteD(c,p.rhfT);                // 열간압연역 상분율 (열간가공성)
+    R.sigEq=sigmaEq(c);
+    R.sigNose=sigmaNose(c);
+    // 1000→600 ℃ 통과시간. 이중상 라인은 수냉이라 짧다
+    R.tSig=8*Math.sqrt(p.crT)*Math.sqrt(50/p.crAnnV);
+    R.sig=100*Math.pow(cl(R.tSig/R.sigNose,0,1),2.5);
+    // 권취온도가 σ역(600~1000 ℃)에 걸리면 코일 서냉으로 대량 석출
+    if(p.ct>600&&p.ct<1000) R.sig=Math.min(100,R.sig+35*(1-Math.abs(p.ct-850)/250));
   }
 
   /* ── 3-7 기계적 성질 ────────────────────────────────────── */
@@ -104,6 +118,18 @@ function compute(key, comp, proc, prices){
         +cl(0.05*(R.d-25),-1.5,2.5)-2.5*Math.max(0,0.6-p.crT);
     ELg=cl(ELg,8,62);
     HV=0.21*TS+0.09*YS+5;
+  }else if(fam==='duplex'){
+    /* ── 이중상 : 상분율과 σ상이 물성·내식성을 함께 지배 ── */
+    const hpD=Math.pow(R.d/1000,-0.5);
+    const ysD=90+1.8*c.Cr+35*c.Si+18*c.Mn+10*c.Mo+800*c.N+14*hpD
+              +0.6*Math.abs(R.aF-50);          // 상분율이 50 에서 멀수록 약간 경화
+    const tsD=ysD+210+400*c.N;
+    // σ상은 취화 인자 — 연신을 깎고 경도를 올린다
+    const elD=33-0.020*(ysD-450)-0.15*Math.abs(R.aF-50)-0.35*R.sig
+              -2.0*Math.max(0,0.6-p.crT);
+    YS=ysD; TS=tsD; ELg=cl(elD,5,40);
+    HV=0.24*tsD+0.10*ysD+15+1.5*R.sig;
+    R.ysD=ysD; R.tsD=tsD;
   }else{
     const freeI=Math.min(Ceff+Neff, subCR?0.002:0.008);
     R.freeI=freeI;
@@ -132,9 +158,9 @@ function compute(key, comp, proc, prices){
   R.elMd = fam==="austenitic" ? ELg : null;
 
   /* ── 3-8 내식성 ─────────────────────────────────────────── */
-  const famOff={austenitic:0,ferritic:-50,martensitic:-60}[fam];
+  const famOff={austenitic:0,ferritic:-50,martensitic:-60,duplex:160}[fam];
   R.dS=-60*(L10(Math.max(c.S,1e-5))+3.7);
-  R.dSens=-1.8*R.DOS;
+  R.dSens=-1.8*R.DOS-5*R.sig;          // σ상은 주변 Cr 결핍으로 공식 기점이 된다
   R.dTi=-100*Math.max(0,c.Ti-0.05);
   R.dGr=-0.4*(R.d-25);
   R.Ep=-75+21*R.pren+famOff+R.dS+R.dSens+R.dTi+R.dGr;
@@ -182,6 +208,25 @@ function compute(key, comp, proc, prices){
   eq('용접부 페라이트수 (WRC-1992)',
      'Creq = Cr+Mo+0.7Nb , Nieq = Ni+35C+20N+0.25Cu\nFN ≈ 3.34Creq − 2.46Nieq − 28.6',
      `FN = ${R.FN.toFixed(1)}`,'WRC-1992 등FN선의 선형근사');
+  if(fam==='duplex'){
+    eq('이중상 상분율',
+       'Creq = Cr+1.5Si+Mo+2Nb+3Ti\nNieq = Ni+22C+18N+0.4Mn+0.5Cu\nα% = 50 + 3.0·(Creq − Nieq − 16.5) + 0.18·(T − 1060)',
+       `Creq ${creqD(c).toFixed(2)} , Nieq ${nieqD(c).toFixed(2)} , 차 ${(creqD(c)-nieqD(c)).toFixed(2)}\n`
+       +`소둔 ${p.crAnnT} ℃ → 페라이트 ${R.aF.toFixed(1)} %  (목표 40~60 %)\n`
+       +`열간역 ${p.rhfT} ℃ → ${R.aFhot.toFixed(1)} %  (열간가공성)`,
+       '2205·2304·2507 이 모두 Creq−Nieq ≈ 16.5 에서 페라이트 50 % 인 점에 맞춘 내부 상관식');
+    eq('σ상 석출 감수성',
+       'σeq = Cr + 4.5Mo + 1.5Si\nlog₁₀ t_nose[s] = 8.3 − 0.155·σeq   (850 ℃ 기준)',
+       `σeq ${R.sigEq.toFixed(1)} → 노즈시간 ${R.sigNose.toFixed(0)} s\n`
+       +`1000→600 ℃ 통과 ${R.tSig.toFixed(1)} s , 권취 ${p.ct} ℃\n`
+       +`σ상 ${R.sig.toFixed(1)} %  → 연신 ${(-0.35*R.sig).toFixed(1)} %p, Epit ${(-5*R.sig).toFixed(0)} mV, HV +${(1.5*R.sig).toFixed(0)}`,
+       'σ상은 600~1000 ℃ 에서 석출해 취화와 Cr 결핍을 동시에 일으킨다. 권취·소둔 냉각이 이 구간을 빨리 지나야 한다');
+    eq('강도 — 이중상 미세조직 + 질소 고용',
+       'σy = 90+1.8Cr+35Si+18Mn+10Mo+800N+14·d^−½ + 0.6·|α−50|',
+       `d ${R.d.toFixed(1)} µm (ASTM ${R.G.toFixed(1)}) → YS ${R.ysD.toFixed(0)} , TS ${R.tsD.toFixed(0)} MPa\n`
+       +`N ${c.N} % 기여 ${(800*c.N).toFixed(0)} MPa — 이중상 고강도의 주 인자`,
+       '오스테나이트계 대비 2 배 강도는 미세 이중상 조직과 고질소 고용강화에서 나온다');
+  }
   if(fam==='austenitic'){
     eq('Md30 — 가공유기 마르텐사이트 (Nohara)',
        'Md30 = 551 − 462(C+N) − 9.2Si − 8.1Mn − 13.7Cr\n        − 29(Ni+Cu) − 18.5Mo − 68Nb − 1.42(ν−8)',
@@ -200,7 +245,7 @@ function compute(key, comp, proc, prices){
        'Ms = 1305 − 1665(C+N) − 28Si − 33Mn − 42Cr − 61Ni',
        `Ms = ${R.msA.toFixed(0)} ℃ → 실온에서 열적 마르텐사이트 없음`,
        'Eichelman & Hull, Trans. ASM 45 (1953)');
-  }else{
+  }else if(fam==="ferritic"||fam==="martensitic"){
     eq('γmax — 최대 오스테나이트량',
        '%γmax = 420C+470N+23Ni+9Cu+7Mn−11.5Cr−11.5Si\n          −12Mo−47Nb−49Ti−52Al+189',
        `γmax = ${R.gmax.toFixed(1)} %`,'페라이트계 STS γmax 회귀식');
@@ -220,7 +265,7 @@ function compute(key, comp, proc, prices){
        `σy(페라이트) = ${R.ysF.toFixed(0)} MPa , d = ${R.d.toFixed(1)} µm (ASTM ${R.G.toFixed(1)})`
        +(R.fm>0.01?`\n마르텐사이트 ${(R.fm*100).toFixed(0)} % 혼합 → ${YS.toFixed(0)} MPa`:''),
        'ky = 0.6 MPa·m^½ (BCC), 고용강화계수는 페라이트계 문헌값');
-    eq('성형성 지표','r̄ = f(냉간압하율, 열연소둔, 고용 C+N, Nb+Ti)\n리징 = f(열연립경, 압하율, FDT)',
+    if(fam==="ferritic") eq("성형성 지표",'r̄ = f(냉간압하율, 열연소둔, 고용 C+N, Nb+Ti)\n리징 = f(열연립경, 압하율, FDT)',
        `r̄ = ${R.rbar.toFixed(2)} , 리징지수 = ${R.ridge.toFixed(1)} / 10`,
        '{111} 재결정집합조직 형성 인자 기반 내부 지수');
   }
